@@ -1,537 +1,450 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import AppShell from "../components/AppShell";
+import PageHeader from "../components/PageHeader";
 import {
-  workers,
-  primaryAssignments,
-  workerSkills,
-  productionStations,
-} from "@/lib/workers";
+  generateSmartAssignments,
+  type Assignment,
+  type AttendanceStatus,
+  type Employee,
+} from "@/lib/assignmentEngine";
 
-type Status = "Present" | "Half-day AM" | "Half-day PM" | "Absent" | "None";
-
-type Assignment = {
-  station: string;
-  primary: string;
-  support: string;
-  status: string;
-  notes: string;
-  jobs: number;
-};
+type Status = AttendanceStatus;
 
 type DailyOpsData = {
-  stations: {
-    name: string;
-    jobs: number;
-  }[];
-  rushOrders: {
-    station: string;
-    name: string;
-  }[];
+  stations: { name: string; jobs: number }[];
+  rushOrders: { station: string; name: string }[];
 };
 
-const WIP_LIMIT = 20;
+const DISPLAY_STATIONS = [
+  "Station 1 & 2 (Layouting & Encoding)",
+  "Admin Head - (For Approval to Printing)",
+  "Quality Checking",
+  "Receiving & Pre-Print Formatting",
+  "Running",
+  "Numbering",
+  "Collating",
+  "Stapling / Padding",
+  "Cutting & Trimming",
+  "Browning",
+  "Stamping",
+  "Packaging & Labelling",
+  "Finish Receipt",
+  "Ready for Release",
+];
 
-function getTodayKey() {
-  return new Date().toISOString().split("T")[0];
+function normalize(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function getStorageKey() {
-  return `daily-operations-${getTodayKey()}`;
+function stationMatches(trelloName: string, displayName: string) {
+  const trello = normalize(trelloName);
+  const display = normalize(displayName);
+
+  return trello.includes(display) || display.includes(trello);
 }
 
-function getStationSnapshot(stations: DailyOpsData["stations"]) {
+function shortStation(station: string) {
+  return station
+    .replace("Station 1 & 2 (Layouting & Encoding)", "Station 1 & 2")
+    .replace("Admin Head - (For Approval to Printing)", "Admin Head")
+    .replace("Receiving & Pre-Print Formatting", "Pre-Print")
+    .replace("Packaging & Labelling", "Packaging");
+}
+
+function assignmentSignature(assignments: Assignment[]) {
   return JSON.stringify(
-    stations.map((station) => ({
-      name: station.name,
-      jobs: station.jobs,
+    assignments.map((item) => ({
+      station: item.station,
+      jobs: item.jobs,
+      primary: item.primary,
+      support: item.support,
+      status: item.status,
     }))
   );
 }
 
 export default function DailyOperationsPage() {
-  const [attendance, setAttendance] = useState<Record<string, Status>>(
-    Object.fromEntries(
-      workers.map((worker) => [
-        worker.name,
-        worker.name === "OJT" ? "None" : "Present",
-      ])
-    )
-  );
-
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [attendance, setAttendance] = useState<Record<string, Status>>({});
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [generatedAt, setGeneratedAt] = useState("");
+  const [hasGenerated, setHasGenerated] = useState(false);
   const [dailyData, setDailyData] = useState<DailyOpsData>({
     stations: [],
     rushOrders: [],
   });
-  const [loadedSavedData, setLoadedSavedData] = useState(false);
+
+  const lastSavedSignatureRef = useRef("");
+
+  const activeEmployees = useMemo(
+    () =>
+      employees.filter(
+        (employee) =>
+          employee.status?.toString().trim().toLowerCase() === "active"
+      ),
+    [employees]
+  );
 
   useEffect(() => {
-    loadDailyData();
+    loadAll();
 
     const interval = setInterval(() => {
       loadDailyData();
-    }, 30000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem(getStorageKey());
+    if (!activeEmployees.length) return;
 
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setAttendance(parsed.attendance || attendance);
-      setAssignments(parsed.assignments || []);
-      setGeneratedAt(parsed.generatedAt || "");
-    }
+    const defaultAttendance = Object.fromEntries(
+      activeEmployees.map((employee) => [
+        employee.name,
+        employee.employmentType?.toLowerCase() === "ojt" ? "None" : "Present",
+      ])
+    ) as Record<string, Status>;
 
-    setLoadedSavedData(true);
-  }, []);
+    setAttendance(defaultAttendance);
+  }, [activeEmployees]);
 
-  useEffect(() => {
-    if (!loadedSavedData) return;
-    if (!dailyData.stations.length) return;
 
-    const saved = localStorage.getItem(getStorageKey());
-    if (!saved) return;
+  async function loadAll() {
+    await Promise.all([loadEmployees(), loadDailyData(), loadTodayAssignments()]);
+  }
 
-    const parsed = JSON.parse(saved);
-    const oldSnapshot = parsed.stationSnapshot || "";
-    const newSnapshot = getStationSnapshot(dailyData.stations);
+  async function loadEmployees() {
+    const res = await fetch("/api/employees", { cache: "no-store" });
+    if (!res.ok) return;
 
-    if (oldSnapshot && oldSnapshot !== newSnapshot) {
-      generateAssignments(true);
-    }
-  }, [dailyData, loadedSavedData]);
+    const data = await res.json();
+    setEmployees(data.employees || []);
+  }
 
   async function loadDailyData() {
-    const res = await fetch("/api/daily-operations", {
+    try {
+      const res = await fetch("/api/daily-operations", { cache: "no-store" });
+      if (!res.ok) return;
+
+      const data = await res.json();
+      setDailyData(data);
+    } catch (error) {
+      console.error("Daily operations fetch failed:", error);
+    }
+  }
+
+  async function loadTodayAssignments() {
+    const res = await fetch("/api/daily-assignments", {
       cache: "no-store",
     });
 
     if (!res.ok) return;
 
     const data = await res.json();
-    setDailyData(data);
+
+    if (data.assignments?.length > 0) {
+      setAssignments(data.assignments);
+      setGeneratedAt(data.generatedAt || "");
+      setHasGenerated(true);
+      lastSavedSignatureRef.current = assignmentSignature(data.assignments);
+    }
   }
 
-  const attendanceSummary = useMemo(() => {
-    const values = Object.values(attendance);
-
-    const present = values.filter((v) => v === "Present").length;
-    const halfDay = values.filter(
-      (v) => v === "Half-day AM" || v === "Half-day PM"
-    ).length;
-    const absent = values.filter((v) => v === "Absent").length;
-    const none = values.filter((v) => v === "None").length;
-
-    const activeWorkers = present + halfDay;
-    const totalWorkers = workers.length - none;
-
-    const coverage =
-      totalWorkers === 0 ? 0 : Math.round((activeWorkers / totalWorkers) * 100);
-
-    return {
-      present,
-      halfDay,
-      absent,
-      none,
-      coverage,
-      activeWorkers,
-    };
-  }, [attendance]);
-
-  const workerUtilization = useMemo(() => {
-    const load: Record<string, number> = {};
-
-    assignments.forEach((assignment) => {
-      if (assignment.primary !== "—") {
-        load[assignment.primary] = (load[assignment.primary] || 0) + 1;
-      }
-
-      if (assignment.support !== "—") {
-        load[assignment.support] = (load[assignment.support] || 0) + 1;
-      }
-    });
-
-    return Object.entries(load).sort((a, b) => b[1] - a[1]);
-  }, [assignments]);
-
-  const capacityStatus =
-    attendanceSummary.activeWorkers >= 7
-      ? "High"
-      : attendanceSummary.activeWorkers >= 5
-      ? "Moderate"
-      : "Low";
-
-  function saveTodayAssignment(
-    newAttendance: Record<string, Status>,
-    newAssignments: Assignment[]
-  ) {
-    const now = new Date().toLocaleString();
-
-    localStorage.setItem(
-      getStorageKey(),
-      JSON.stringify({
-        date: getTodayKey(),
-        attendance: newAttendance,
-        assignments: newAssignments,
-        generatedAt: now,
-        stationSnapshot: getStationSnapshot(dailyData.stations),
-      })
+  function getStationJobsFromData(data: DailyOpsData, stationName: string) {
+    return (
+      data.stations.find((station) => stationMatches(station.name, stationName))
+        ?.jobs || 0
     );
-
-    setGeneratedAt(now);
-  }
-
-  function updateStatus(workerName: string, status: Status) {
-    const updated = {
-      ...attendance,
-      [workerName]: status,
-    };
-
-    setAttendance(updated);
   }
 
   function getStationJobs(stationName: string) {
-    return (
-      dailyData.stations.find((station) =>
-        station.name.toUpperCase().includes(stationName.toUpperCase())
-      )?.jobs || 0
-    );
+    return getStationJobsFromData(dailyData, stationName);
   }
 
-  function isAvailable(workerName: string) {
-    const status = attendance[workerName];
-
-    return (
-      status === "Present" ||
-      status === "Half-day AM" ||
-      status === "Half-day PM"
-    );
+  function getStationLoads(data: DailyOpsData) {
+    return DISPLAY_STATIONS.map((station) => ({
+      name: station,
+      jobs: getStationJobsFromData(data, station),
+    }));
   }
 
-  function generateAssignments(isAutoRegenerate = false) {
-    const workerLoad: Record<string, number> = {};
+  async function saveAssignments(
+    nextAssignments: Assignment[],
+    sourceAttendance: Record<string, Status>
+  ) {
+    const signature = assignmentSignature(nextAssignments);
 
-    const result = productionStations.map((station) => {
-      const primary = primaryAssignments[station];
-      const primaryStatus = attendance[primary];
-      const jobs = getStationJobs(station);
+    if (signature === lastSavedSignatureRef.current) return;
 
-      if (jobs === 0) {
-        return {
-          station,
-          primary: "—",
-          support: "—",
-          jobs,
-          status: "No Active Job",
-          notes: "No active job in this station today.",
-        };
-      }
+    lastSavedSignatureRef.current = signature;
 
-      if (primary && isAvailable(primary)) {
-        workerLoad[primary] = (workerLoad[primary] || 0) + 1;
+    const now = new Date().toLocaleString();
 
-        if (primaryStatus === "Half-day AM" || primaryStatus === "Half-day PM") {
-          const support = findSupportWorker(station, primary, workerLoad);
+    setAssignments(nextAssignments);
+    setGeneratedAt(now);
 
-          if (support) {
-            workerLoad[support] = (workerLoad[support] || 0) + 1;
+    await fetch("/api/daily-assignments", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        assignments: nextAssignments,
+      }),
+    });
+  }
 
-            return {
-              station,
-              primary,
-              support,
-              jobs,
-              status: "✅ Covered",
-              notes: `${primary} is ${primaryStatus}; ${support} assigned as support.`,
-            };
-          }
 
-          return {
-            station,
-            primary,
-            support: "—",
-            jobs,
-            status: "⚠️ Partial Coverage",
-            notes: `${primary} is ${primaryStatus}. No support available.`,
-          };
-        }
+  async function handleGenerateAssignments() {
+    const res = await fetch("/api/daily-operations", { cache: "no-store" });
+    if (!res.ok) return;
 
-        return {
-          station,
-          primary,
-          support: "—",
-          jobs,
-          status: "✅ Covered",
-          notes: `${primary} assigned as primary worker.${
-            isAutoRegenerate ? " Auto-updated due to production load change." : ""
-          }`,
-        };
-      }
+    const latestData = await res.json();
+    setDailyData(latestData);
+    setHasGenerated(true);
 
-      const support = findSupportWorker(station, primary, workerLoad);
-
-      if (support) {
-        workerLoad[support] = (workerLoad[support] || 0) + 1;
-
-        return {
-          station,
-          primary: "—",
-          support,
-          jobs,
-          status: "⚠️ Support Assigned",
-          notes: `${primary} unavailable. ${support} assigned as substitute.`,
-        };
-      }
-
-      return {
-        station,
-        primary: "—",
-        support: "—",
-        jobs,
-        status: "⛔ No Coverage",
-        notes: `${primary} unavailable. No qualified worker found.`,
-      };
+    const result = generateSmartAssignments({
+      employees: activeEmployees,
+      stations: getStationLoads(latestData),
+      attendance,
     });
 
-    setAssignments(result);
-    saveTodayAssignment(attendance, result);
+    await saveAssignments(result.assignments, attendance);
   }
 
-  function findSupportWorker(
-    station: string,
-    excludeWorker: string,
-    workerLoad: Record<string, number>
-  ) {
-    const availableWorkers = workers
-      .filter((worker) => worker.name !== excludeWorker)
-      .filter((worker) => isAvailable(worker.name))
-      .filter((worker) => {
-        const skills = workerSkills[worker.name] || [];
-        return skills.includes(station);
-      })
-      .sort((a, b) => (workerLoad[a.name] || 0) - (workerLoad[b.name] || 0));
-
-    return availableWorkers[0]?.name || "";
+  function updateStatus(workerName: string, status: Status) {
+    setAttendance((current) => ({
+      ...current,
+      [workerName]: status,
+    }));
   }
 
-  function resetAttendance() {
+  function resetDay() {
     const defaultAttendance = Object.fromEntries(
-      workers.map((worker) => [
-        worker.name,
-        worker.name === "OJT" ? "None" : "Present",
+      activeEmployees.map((employee) => [
+        employee.name,
+        employee.employmentType?.toLowerCase() === "ojt" ? "None" : "Present",
       ])
     ) as Record<string, Status>;
 
     setAttendance(defaultAttendance);
     setAssignments([]);
     setGeneratedAt("");
-    localStorage.removeItem(getStorageKey());
+    setHasGenerated(false);
+    lastSavedSignatureRef.current = "";
   }
 
-  return (
-    <main className="min-h-screen bg-[#070A0F] p-8 text-white">
-      <div className="mx-auto max-w-7xl">
-        <header className="border-b border-zinc-800 pb-6">
-          <h1 className="text-3xl font-bold text-yellow-400">
-            Daily Operations
-          </h1>
-          <p className="mt-2 text-sm text-zinc-400">
-            Attendance, production load, WIP monitoring, station coverage, and
-            worker utilization.
-          </p>
-          <p className="mt-1 text-sm text-zinc-500">
-            Date Today: {new Date().toLocaleDateString()}
-          </p>
-        </header>
+  const attendanceSummary = useMemo(() => {
+    const values = Object.values(attendance);
 
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-5">
-          <SummaryCard
-            title="Present"
-            value={attendanceSummary.present}
-            color="text-green-400"
-          />
-          <SummaryCard
-            title="Half-Day"
-            value={attendanceSummary.halfDay}
-            color="text-yellow-400"
-          />
-          <SummaryCard
-            title="Absent"
-            value={attendanceSummary.absent}
-            color="text-red-400"
-          />
-          <SummaryCard
-            title="Coverage"
-            value={`${attendanceSummary.coverage}%`}
-            color="text-blue-400"
-          />
-          <SummaryCard
-            title="Capacity"
-            value={capacityStatus}
-            color="text-yellow-400"
-          />
-        </div>
+    const present = values.filter((value) => value === "Present").length;
+    const halfDay = values.filter(
+      (value) => value === "Half-day AM" || value === "Half-day PM"
+    ).length;
+    const absent = values.filter((value) => value === "Absent").length;
+    const none = values.filter((value) => value === "None").length;
+
+    const available = present + halfDay;
+    const total = Math.max(activeEmployees.length - none, 0);
+    const coverage = total === 0 ? 0 : Math.round((available / total) * 100);
+
+    return { present, halfDay, absent, none, available, coverage };
+  }, [attendance, activeEmployees]);
+
+  return (
+    <AppShell activePage="daily-operations">
+      <div className="mx-auto max-w-[1500px]">
+        <PageHeader
+          title="Daily Operations"
+          description="Manage daily attendance, station workload, and smart manpower assignment based on employee skills."
+        />
 
         {generatedAt && (
-          <div className="mt-5 rounded-xl border border-green-800 bg-green-950/30 p-4 text-sm text-green-300">
+          <div className="mt-5 rounded-lg border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-700">
             Assignments saved for today. Last updated: {generatedAt}
           </div>
         )}
 
-        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <section className="rounded-2xl border border-zinc-800 bg-[#0D1118] p-6 xl:col-span-2">
-            <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-xl font-bold">Attendance</h2>
+        <section className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div className="rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm xl:col-span-2">
+            <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-center">
+              <div>
+                <h2 className="text-xl font-bold text-black">
+                  Attendance Management
+                </h2>
+                <p className="mt-1 text-sm text-[#5f5448]">
+                  Active employees are loaded from the Employee Database.
+                </p>
+              </div>
 
               <div className="flex gap-3">
                 <button
-                  onClick={resetAttendance}
-                  className="rounded-xl border border-zinc-700 px-5 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900"
+                  onClick={resetDay}
+                  className="rounded-lg border border-[#e6ddd1] bg-white px-5 py-2 text-sm font-bold text-black hover:bg-[#fbf7ef]"
                 >
                   Reset Day
                 </button>
 
                 <button
-                  onClick={() => generateAssignments(false)}
-                  className="rounded-xl bg-yellow-400 px-5 py-2 text-sm font-bold text-black hover:bg-yellow-300"
+                  onClick={handleGenerateAssignments}
+                  className="rounded-lg bg-[#e1bb5f] px-5 py-2 text-sm font-black text-black hover:bg-[#edca73]"
                 >
-                  {assignments.length > 0
+                  {assignments.length
                     ? "Regenerate Assignments"
                     : "Generate Assignments"}
                 </button>
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-xl border border-zinc-800">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-black text-yellow-400">
+            <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+              <MiniStat title="Present" value={attendanceSummary.present} />
+              <MiniStat title="Half-Day" value={attendanceSummary.halfDay} />
+              <MiniStat title="Absent" value={attendanceSummary.absent} />
+              <MiniStat
+                title="Coverage"
+                value={`${attendanceSummary.coverage}%`}
+              />
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-[#eee4d6]">
+              <table className="w-full min-w-[900px] text-left text-sm">
+                <thead className="bg-[#fbf7ef] text-[#5f5448]">
                   <tr>
                     <th className="p-4">Worker</th>
                     <th className="p-4">Position</th>
+                    <th className="p-4">Employment Type</th>
+                    <th className="p-4 text-center">Max Stations</th>
+                    <th className="p-4">Skills</th>
                     <th className="p-4">Status</th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {workers.map((worker) => (
-                    <tr key={worker.name} className="border-t border-zinc-800">
-                      <td className="p-4 font-bold">{worker.name}</td>
-                      <td className="p-4 text-zinc-300">{worker.position}</td>
-                      <td className="p-4">
-                        <select
-                          value={attendance[worker.name]}
-                          onChange={(e) =>
-                            updateStatus(worker.name, e.target.value as Status)
-                          }
-                          className="rounded-lg border border-zinc-700 bg-zinc-900 p-2 outline-none focus:border-yellow-400"
-                        >
-                          <option>Present</option>
-                          <option>Half-day AM</option>
-                          <option>Half-day PM</option>
-                          <option>Absent</option>
-                          <option>None</option>
-                        </select>
+                  {activeEmployees.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-6 text-center text-[#6f6254]">
+                        No active employees found.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    activeEmployees.map((employee) => (
+                      <tr
+                        key={employee.employeeId}
+                        className="border-t border-[#eee4d6]"
+                      >
+                        <td className="p-4 font-bold text-black">
+                          {employee.name}
+                        </td>
+
+                        <td className="p-4 text-[#5f5448]">
+                          {employee.position}
+                        </td>
+
+                        <td className="p-4 text-[#5f5448]">
+                          {employee.employmentType || "Full-time"}
+                        </td>
+
+                        <td className="p-4 text-center font-bold">
+                          {employee.maxStations || 1}
+                        </td>
+
+                        <td className="p-4">
+                          <span className="text-sm text-[#5f5448]">
+                            {(employee.skills || []).length} skill(s)
+                          </span>
+                        </td>
+
+                        <td className="p-4">
+                          <select
+                            value={attendance[employee.name] || "Present"}
+                            onChange={(e) =>
+                              updateStatus(
+                                employee.name,
+                                e.target.value as Status
+                              )
+                            }
+                            className="rounded-lg border border-[#e6ddd1] bg-white p-2 text-black outline-none focus:border-[#c89132]"
+                          >
+                            <option>Present</option>
+                            <option>Half-day AM</option>
+                            <option>Half-day PM</option>
+                            <option>Absent</option>
+                            <option>None</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
-          </section>
+          </div>
 
-          <section className="rounded-2xl border border-zinc-800 bg-[#0D1118] p-6">
-            <h2 className="mb-4 text-lg font-bold">Production Load</h2>
+          <div className="rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-bold text-black">Production Load</h2>
+            <p className="mt-1 text-sm text-[#5f5448]">
+              Active Trello jobs per station.
+            </p>
 
-            <div className="space-y-3">
-              {productionStations.map((station) => {
+            <div className="mt-5 space-y-3">
+              {DISPLAY_STATIONS.map((station) => {
                 const jobs = getStationJobs(station);
 
                 return (
                   <div
                     key={station}
-                    className="flex items-center justify-between rounded-xl bg-zinc-950 p-4"
+                    className="flex items-center justify-between rounded-lg border border-[#eee4d6] bg-[#fbf7ef] p-4"
                   >
-                    <span className="text-sm">{station}</span>
-                    <span
-                      className={`rounded-md px-3 py-1 text-xs font-bold text-black ${
-                        jobs === 0
-                          ? "bg-zinc-500"
-                          : jobs <= 5
-                          ? "bg-green-500"
-                          : jobs <= 10
-                          ? "bg-yellow-400"
-                          : "bg-red-500"
-                      }`}
-                    >
+                    <span className="text-sm font-semibold text-black">
+                      {shortStation(station)}
+                    </span>
+
+                    <span className="rounded-md bg-green-100 px-3 py-1 text-xs font-bold text-green-700">
                       {jobs}
                     </span>
                   </div>
                 );
               })}
             </div>
-          </section>
-        </div>
-
-        <section className="mt-8 rounded-2xl border border-zinc-800 bg-[#0D1118] p-6">
-          <h2 className="mb-4 text-lg font-bold">WIP Monitor</h2>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {productionStations.map((station) => {
-              const jobs = getStationJobs(station);
-              const percent = (jobs / WIP_LIMIT) * 100;
-
-              return (
-                <div key={station} className="rounded-xl bg-zinc-950 p-4">
-                  <div className="mb-2 flex justify-between gap-3">
-                    <span className="text-sm font-medium">{station}</span>
-                    <span className="text-xs text-zinc-400">
-                      {jobs}/{WIP_LIMIT}
-                    </span>
-                  </div>
-
-                  <div className="h-3 overflow-hidden rounded-full bg-zinc-800">
-                    <div
-                      className={`h-full rounded-full ${
-                        percent >= 100
-                          ? "bg-red-500"
-                          : percent >= 80
-                          ? "bg-yellow-400"
-                          : "bg-green-500"
-                      }`}
-                      style={{
-                        width: `${Math.min(percent, 100)}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </section>
 
-        <section className="mt-8 rounded-2xl border border-zinc-800 bg-[#0D1118] p-6">
-          <h2 className="mb-5 text-xl font-bold">Station Assignments</h2>
+        <section className="mt-5 rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
+          <div className="mb-5 flex flex-col justify-between gap-3 md:flex-row md:items-center">
+            <div>
+              <h2 className="text-xl font-bold text-black">
+                Station Assignments
+              </h2>
+              <p className="mt-1 text-sm text-[#5f5448]">
+                Assignment is generated by the smart workforce engine using
+                skills, attendance, employment type, and max station capacity.
+              </p>
+            </div>
+
+            {assignments.length > 0 && (
+              <span className="rounded-lg border border-[#e6ddd1] bg-white px-4 py-2 text-sm font-bold text-[#8b5e24]">
+                {assignments.length} station(s)
+              </span>
+            )}
+          </div>
 
           {assignments.length === 0 ? (
-            <p className="rounded-xl bg-zinc-950 p-5 text-zinc-400">
-              Click Generate Assignments to compute and save today's station
+            <p className="rounded-lg border border-[#eee4d6] bg-[#fbf7ef] p-5 text-sm text-[#6f6254]">
+              Click Generate Assignments to compute today&apos;s station
               coverage.
             </p>
           ) : (
-            <div className="overflow-hidden rounded-xl border border-zinc-800">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-black text-yellow-400">
+            <div className="overflow-x-auto rounded-lg border border-[#eee4d6]">
+              <table className="w-full min-w-[1200px] text-left text-sm">
+                <thead className="bg-[#fbf7ef] text-[#5f5448]">
                   <tr>
                     <th className="p-4">Station</th>
-                    <th className="p-4">Jobs</th>
+                    <th className="p-4 text-center">Jobs</th>
                     <th className="p-4">Primary Worker</th>
                     <th className="p-4">Support Worker</th>
-                    <th className="p-4">Coverage Status</th>
+                    <th className="p-4">Coverage</th>
                     <th className="p-4">Notes</th>
                   </tr>
                 </thead>
@@ -540,14 +453,31 @@ export default function DailyOperationsPage() {
                   {assignments.map((assignment) => (
                     <tr
                       key={assignment.station}
-                      className="border-t border-zinc-800"
+                      className="border-t border-[#eee4d6]"
                     >
-                      <td className="p-4 font-bold">{assignment.station}</td>
-                      <td className="p-4">{assignment.jobs}</td>
-                      <td className="p-4">{assignment.primary}</td>
-                      <td className="p-4">{assignment.support}</td>
-                      <td className="p-4 font-bold">{assignment.status}</td>
-                      <td className="p-4 text-zinc-300">{assignment.notes}</td>
+                      <td className="p-4 font-bold text-black">
+                        {shortStation(assignment.station)}
+                      </td>
+
+                      <td className="p-4 text-center font-bold">
+                        {assignment.jobs}
+                      </td>
+
+                      <td className="p-4 text-[#3f352a]">
+                        {assignment.primary}
+                      </td>
+
+                      <td className="p-4 text-[#3f352a]">
+                        {assignment.support}
+                      </td>
+
+                      <td className="p-4">
+                        <CoverageBadge status={assignment.status} />
+                      </td>
+
+                      <td className="p-4 text-[#6f6254]">
+                        {assignment.notes}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -556,73 +486,42 @@ export default function DailyOperationsPage() {
           )}
         </section>
 
-        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <section className="rounded-2xl border border-zinc-800 bg-[#0D1118] p-6">
-            <h2 className="mb-4 text-lg font-bold">Worker Utilization</h2>
-
-            {workerUtilization.length === 0 ? (
-              <p className="rounded-xl bg-zinc-950 p-5 text-zinc-400">
-                Generate assignments to view worker utilization.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {workerUtilization.map(([worker, count]) => (
-                  <div
-                    key={worker}
-                    className="flex items-center justify-between rounded-xl bg-zinc-950 p-4"
-                  >
-                    <span>{worker}</span>
-                    <span className="rounded-md bg-green-500 px-3 py-1 text-xs font-bold text-black">
-                      {count} station(s)
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="rounded-2xl border border-zinc-800 bg-[#0D1118] p-6">
-            <h2 className="mb-4 text-lg font-bold">Rush Orders</h2>
-
-            {dailyData.rushOrders.length === 0 ? (
-              <p className="rounded-xl bg-zinc-950 p-5 text-zinc-400">
-                No rush orders detected.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {dailyData.rushOrders.map((order, index) => (
-                  <div
-                    key={`${order.name}-${index}`}
-                    className="rounded-xl border border-red-500/40 bg-red-950/30 p-4"
-                  >
-                    <p className="font-bold text-red-300">{order.name}</p>
-                    <p className="mt-1 text-xs text-zinc-400">
-                      Current Station: {order.station}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
+        <footer className="mt-8 text-center text-xs text-[#7c6a56]">
+          © 2026 LIC Printing Shop. Production Management System.
+        </footer>
       </div>
-    </main>
+    </AppShell>
   );
 }
 
-function SummaryCard({
-  title,
-  value,
-  color,
-}: {
-  title: string;
-  value: number | string;
-  color: string;
-}) {
+function MiniStat({ title, value }: { title: string; value: number | string }) {
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-[#0D1118] p-5">
-      <p className="text-sm text-zinc-400">{title}</p>
-      <h2 className={`mt-2 text-3xl font-bold ${color}`}>{value}</h2>
+    <div className="rounded-lg border border-[#eee4d6] bg-[#fbf7ef] p-4">
+      <p className="text-xs font-bold uppercase tracking-wider text-[#6f6254]">
+        {title}
+      </p>
+      <p className="mt-2 text-2xl font-black text-black">{value}</p>
     </div>
+  );
+}
+
+function CoverageBadge({ status }: { status: string }) {
+  const style =
+    status === "Covered"
+      ? "bg-green-100 text-green-700"
+      : status === "Needs Support"
+      ? "bg-amber-100 text-amber-700"
+      : status === "Unavailable"
+      ? "bg-orange-100 text-orange-700"
+      : status === "Admin Only"
+      ? "bg-blue-100 text-blue-700"
+      : status === "No Active Job"
+      ? "bg-[#f8ead3] text-[#8b5e24]"
+      : "bg-red-100 text-red-700";
+
+  return (
+    <span className={`rounded-md px-3 py-1 text-xs font-bold ${style}`}>
+      {status}
+    </span>
   );
 }

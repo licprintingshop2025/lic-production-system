@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { appendReceivedATPRow } from "@/lib/googleSheets";
 
 function generateTrackingNumber() {
   const now = new Date();
@@ -65,37 +66,6 @@ function buildOrderType(receiptType: string, booklets: string) {
     .join(" ");
 }
 
-async function addPriorityLabel({
-  cardId,
-  priority,
-  key,
-  token,
-}: {
-  cardId: string;
-  priority: string;
-  key: string;
-  token: string;
-}) {
-  const isRush = priority.toUpperCase() === "RUSH";
-
-  const labelName = isRush ? "Rush" : "Normal";
-  const labelColor = isRush ? "red" : "green";
-
-  await fetch(
-    `https://api.trello.com/1/cards/${cardId}/labels?key=${key}&token=${token}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: labelName,
-        color: labelColor,
-      }),
-    }
-  );
-}
-
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -135,7 +105,6 @@ export async function POST(req: Request) {
     const dateOfAtp = formatDate(body.dateOfAtp);
     const atpStatus = clean(body.atpStatus || body.atpReceived || "ATP");
     const booklets = clean(body.noOfBooklets);
-    const priority = clean(body.orderPriority || "Normal");
 
     const orderType = buildOrderType(receiptType, booklets);
 
@@ -193,9 +162,6 @@ ${taxType || "-"}
 
 ATP STATUS:
 ${atpStatus || "-"}
-
-PRIORITY:
-${priority || "Normal"}
 `.trim();
 
     const response = await fetch(
@@ -225,6 +191,43 @@ ${priority || "Normal"}
 
     const card = await response.json();
 
+    try {
+      const rowData = [
+        new Date().toLocaleString(),
+        trackingNo,
+        body.dateOfAtp,
+        clean(body.ocn),
+        clean(body.tin),
+        clean(body.taxpayerName),
+        tradeName,
+        clean(body.registeredAddress),
+        `'${rdoCode}`,
+        clean(body.mannerDocType),
+        receiptType,
+        taxType,
+        booklets,
+        clean(body.setsPerBooklet),
+        copies,
+        clean(body.serialNumbers),
+        atpStatus,
+        staffName,
+        card.id,
+      ];
+
+      await appendReceivedATPRow(rowData);
+      
+    } catch (sheetError) {
+      return NextResponse.json(
+        {
+          error: "Trello card created, but failed to save to Google Sheet",
+          trackingNo,
+          card,
+          details:
+            sheetError instanceof Error ? sheetError.message : "Unknown error",
+        },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

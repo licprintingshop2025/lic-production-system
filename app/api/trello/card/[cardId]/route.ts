@@ -1,14 +1,5 @@
 import { NextResponse } from "next/server";
 
-function calculateDueDate(priority: string) {
-  const date = new Date();
-  const daysToAdd = priority.toLowerCase() === "rush" ? 3 : 7;
-
-  date.setDate(date.getDate() + daysToAdd);
-
-  return date.toISOString();
-}
-
 async function removePriorityLabels(cardId: string, key: string, token: string) {
   const res = await fetch(
     `https://api.trello.com/1/cards/${cardId}/labels?key=${key}&token=${token}`,
@@ -100,7 +91,7 @@ export async function PUT(
     );
   }
 
-  const updateBody: any = {};
+  const updateBody: Record<string, string> = {};
 
   if (body.listId) {
     updateBody.idList = body.listId;
@@ -133,19 +124,6 @@ export async function PUT(
   if (body.orderPriority) {
     await removePriorityLabels(cardId, key, token);
     await addPriorityLabel(cardId, body.orderPriority, key, token);
-
-    const dueDate = calculateDueDate(body.orderPriority);
-
-    await fetch(
-      `https://api.trello.com/1/cards/${cardId}?key=${key}&token=${token}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          due: dueDate,
-        }),
-      }
-    );
   }
 
   return NextResponse.json({ success: true, card });

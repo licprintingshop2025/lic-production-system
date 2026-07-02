@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  findReceivedATPByCardId,
+  findNonBIROrderByCardId,
+} from "@/lib/googleSheets";
 
 type RouteContext = {
   params: Promise<{ cardId: string }>;
@@ -17,15 +21,9 @@ type ProductionDetailsPayload = {
   specialInstructions?: string;
 };
 
-function calculateDueDate(priority: string) {
-  const date = new Date();
-  date.setDate(date.getDate() + (priority.toLowerCase() === "rush" ? 3 : 7));
-  return date.toISOString();
-}
-
-function getField(desc: string, label: string) {
-  const regex = new RegExp(`${label}:\\s*\\n?([^\\n]+)`, "i");
-  return desc.match(regex)?.[1]?.trim() || "-";
+function value(data: unknown) {
+  const text = String(data || "").trim();
+  return text || "-";
 }
 
 async function getOrCreatePriorityLabel(
@@ -161,23 +159,44 @@ export async function PUT(req: Request, context: RouteContext) {
     }
 
     const card = await getCardRes.json();
-    const oldDesc = card.desc || "";
+
+    const birRecord = await findReceivedATPByCardId(cardId);
+    const nonBirRecord = await findNonBIROrderByCardId(cardId);
+
+    const birRow = birRecord?.row || [];
+    const nonBirRow = nonBirRecord?.row || [];
+
+    const isNonBir =
+      !!nonBirRecord ||
+      String(card.name || "").toUpperCase().includes("NON-BIR") ||
+      String(card.name || "").toUpperCase().includes("NON BIR");
+
+    const trackingNo = isNonBir ? value(nonBirRow[0]) : value(birRow[1]);
+    const tradeName = isNonBir ? value(nonBirRow[2]) : value(birRow[6]);
+    const ocn = isNonBir ? "-" : value(birRow[3]);
+    const tin = isNonBir ? "-" : value(birRow[4]);
+    const rdo = isNonBir ? "-" : value(birRow[8]);
+    const documentType = isNonBir ? value(nonBirRow[3]) : value(birRow[10]);
+    const taxType = isNonBir ? "NON-BIR" : value(birRow[11]);
+    const atp = isNonBir ? "-" : value(birRow[16]);
+    const qty = isNonBir ? value(nonBirRow[4]) : value(birRow[12]);
+    const serial = isNonBir ? value(nonBirRow[5]) : value(birRow[15]);
 
     const compactDescription = `
-TRACKING: ${getField(oldDesc, "TRACKING")}
+TRACKING: ${trackingNo}
 
-OCN: ${getField(oldDesc, "OCN")}
-TIN: ${getField(oldDesc, "TIN")}
+OCN: ${ocn}
+TIN: ${tin}
 
-TRADE NAME: ${getField(oldDesc, "TRADE NAME")}
-RDO: ${getField(oldDesc, "RDO")}
+TRADE NAME: ${tradeName}
+RDO: ${rdo}
 
-DOCUMENT: ${getField(oldDesc, "DOCUMENT")}
-TAX TYPE: ${getField(oldDesc, "TAX TYPE")}
-ATP: ${getField(oldDesc, "ATP STATUS")}
+DOCUMENT: ${documentType}
+TAX TYPE: ${taxType}
+ATP: ${atp}
 
-QTY: ${getField(oldDesc, "QTY")}
-SERIAL: ${getField(oldDesc, "SERIAL")}
+QTY: ${qty}
+SERIAL: ${serial}
 
 PRIORITY: ${body.orderPriority}
 
@@ -189,8 +208,6 @@ SPECIAL: ${body.specialInstructions || "-"}
 STATUS: Production Details Complete
 `.trim();
 
-    const dueDate = calculateDueDate(body.orderPriority);
-
     const updateRes = await fetch(
       `https://api.trello.com/1/cards/${cardId}?key=${key}&token=${token}`,
       {
@@ -199,7 +216,6 @@ STATUS: Production Details Complete
         body: JSON.stringify({
           desc: compactDescription,
           idList: station4ListId,
-          due: dueDate,
         }),
       }
     );
@@ -238,9 +254,14 @@ STATUS: Production Details Complete
       success: true,
       card: await updateRes.json(),
     });
-  } catch {
+  } catch (error) {
     return NextResponse.json(
-      { error: "Server error while saving production details." },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Server error while saving production details.",
+      },
       { status: 500 }
     );
   }

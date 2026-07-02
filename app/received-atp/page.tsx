@@ -1,32 +1,62 @@
 "use client";
 
 import { useState } from "react";
+import AppShell from "../components/AppShell";
+import PageHeader from "../components/PageHeader";
+
+type FormData = {
+  dateOfAtp: string;
+  ocn: string;
+  tin: string;
+  taxpayerName: string;
+  businessName: string;
+  registeredAddress: string;
+  rdoCode: string;
+  mannerDocType: string;
+  receiptType: string;
+  receiptTypeOther: string;
+  taxType: string;
+  noOfBooklets: string;
+  setsPerBooklet: string;
+  copiesPerSet: string;
+  copiesPerSetOther: string;
+  serialNumbers: string;
+  atpReceived: string;
+  salesAssigned: string;
+  salesAssignedOther: string;
+};
+
+const initialFormData: FormData = {
+  dateOfAtp: "",
+  ocn: "",
+  tin: "",
+  taxpayerName: "",
+  businessName: "",
+  registeredAddress: "",
+  rdoCode: "",
+  mannerDocType: "",
+  receiptType: "",
+  receiptTypeOther: "",
+  taxType: "",
+  noOfBooklets: "",
+  setsPerBooklet: "50",
+  copiesPerSet: "",
+  copiesPerSetOther: "",
+  serialNumbers: "",
+  atpReceived: "",
+  salesAssigned: "",
+  salesAssignedOther: "",
+};
 
 export default function ReceivedATPPage() {
-  const [formData, setFormData] = useState({
-    dateOfAtp: "",
-    ocn: "",
-    tin: "",
-    taxpayerName: "",
-    businessName: "",
-    registeredAddress: "",
-    rdoCode: "",
-    mannerDocType: "",
-    receiptType: "",
-    receiptTypeOther: "",
-    taxType: "",
-    noOfBooklets: "",
-    setsPerBooklet: "50",
-    copiesPerSet: "",
-    copiesPerSetOther: "",
-    serialNumbers: "",
-    atpReceived: "",
-    salesAssigned: "",
-    salesAssignedOther: "",
-  });
+  const [formData, setFormData] = useState<FormData>(initialFormData);
+  const [saving, setSaving] = useState(false);
+  const [savedTrackingNo, setSavedTrackingNo] = useState("");
 
   function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
   ) {
     setFormData({
       ...formData,
@@ -34,58 +64,140 @@ export default function ReceivedATPPage() {
     });
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-  e.preventDefault();
-
-  const response = await fetch("/api/received-atp", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(formData),
-  });
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    alert(result.error || "Failed to save ATP record.");
-    console.error(result);
-    return;
+  function handleReset() {
+    setFormData(initialFormData);
+    setSavedTrackingNo("");
   }
 
-  alert(`ATP Record Saved!\n\nTracking No: ${result.trackingNo}`);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
 
-  console.log("Created Trello Card:", result.card);
-}
+    try {
+      setSaving(true);
+      setSavedTrackingNo("");
+
+      const response = await fetch("/api/received-atp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(result.error || "Failed to save ATP record.");
+        console.error(result);
+        return;
+      }
+
+      setSavedTrackingNo(result.trackingNo);
+      alert(`ATP Record Saved!\n\nTracking No: ${result.trackingNo}`);
+
+      setFormData(initialFormData);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
-    <main className="min-h-screen bg-[#070A0F] p-6 text-white">
-      <div className="mx-auto max-w-6xl">
-        <header className="mb-8 border-b border-zinc-800 pb-6">
-          <h1 className="text-4xl font-bold text-yellow-400">Received ATP</h1>
-          <p className="mt-2 text-sm text-zinc-400">
-            PSMA-DSS Intake Module based on LIC Received ATP Form
-          </p>
-        </header>
+    <AppShell activePage="received-atp">
+      <div className="mx-auto max-w-[1400px]">
+        <PageHeader
+          title="Received ATP Intake"
+          description="Encode received ATP records and automatically create a Trello job card using LIC's production workflow format."
+        />
 
-        <form onSubmit={handleSubmit} className="space-y-8">
-          <Section title="1. Taxpayer Information">
-            <Input label="Date of ATP" name="dateOfAtp" type="date" onChange={handleChange} required />
-            <Input label="OCN" name="ocn" onChange={handleChange} required />
-            <Input label="TIN" name="tin" onChange={handleChange} required />
-            <Input label="Taxpayer Name" name="taxpayerName" onChange={handleChange} required />
-            <Input label="Business / Trade Name" name="businessName" onChange={handleChange} required />
-            <Input label="RDO Code" name="rdoCode" onChange={handleChange} required />
+        {savedTrackingNo && (
+          <section className="mt-8 rounded-2xl border border-green-200 bg-green-50 p-6 shadow-[0_2px_10px_rgba(70,45,20,0.08)]">
+            <p className="text-xs font-bold uppercase tracking-[0.25em] text-green-700">
+              Record Saved
+            </p>
+            <h2 className="mt-2 text-2xl font-black text-black">
+              Tracking Number Generated
+            </h2>
+            <p className="mt-3 rounded-xl border border-green-200 bg-white p-4 font-mono text-lg font-bold text-green-700">
+              {savedTrackingNo}
+            </p>
+          </section>
+        )}
+
+        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+          <FormSection
+            number="01"
+            title="Taxpayer Information"
+            description="Basic taxpayer and registered business details."
+          >
+            <Input
+              label="Date of ATP"
+              name="dateOfAtp"
+              type="date"
+              value={formData.dateOfAtp}
+              onChange={handleChange}
+              required
+            />
+
+            <Input
+              label="OCN"
+              name="ocn"
+              value={formData.ocn}
+              onChange={handleChange}
+              required
+            />
+
+            <Input
+              label="TIN"
+              name="tin"
+              value={formData.tin}
+              onChange={handleChange}
+              required
+            />
+
+            <Input
+              label="Taxpayer Name"
+              name="taxpayerName"
+              value={formData.taxpayerName}
+              onChange={handleChange}
+              required
+            />
+
+            <Input
+              label="Business / Trade Name"
+              name="businessName"
+              value={formData.businessName}
+              onChange={handleChange}
+              required
+            />
+
+            <Input
+              label="RDO Code"
+              name="rdoCode"
+              value={formData.rdoCode}
+              onChange={handleChange}
+              required
+            />
 
             <div className="md:col-span-2">
-              <Textarea label="Registered Address" name="registeredAddress" onChange={handleChange} required />
+              <Textarea
+                label="Registered Address"
+                name="registeredAddress"
+                value={formData.registeredAddress}
+                onChange={handleChange}
+                required
+              />
             </div>
-          </Section>
+          </FormSection>
 
-          <Section title="2. Document Information">
+          <FormSection
+            number="02"
+            title="Document Information"
+            description="Define receipt or invoice type, tax type, and document manner."
+          >
             <Select
               label="Manner / Doc Type"
               name="mannerDocType"
+              value={formData.mannerDocType}
               onChange={handleChange}
               required
               options={["BOUND", "LOOSE"]}
@@ -94,6 +206,7 @@ export default function ReceivedATPPage() {
             <Select
               label="Description / Kind of Invoice or Receipt"
               name="receiptType"
+              value={formData.receiptType}
               onChange={handleChange}
               required
               options={[
@@ -112,24 +225,43 @@ export default function ReceivedATPPage() {
             />
 
             {formData.receiptType === "OTHER" && (
-              <Input label="Specify Other Receipt Type" name="receiptTypeOther" onChange={handleChange} required />
+              <Input
+                label="Specify Other Receipt Type"
+                name="receiptTypeOther"
+                value={formData.receiptTypeOther}
+                onChange={handleChange}
+                required
+              />
             )}
 
             <Select
               label="Tax Type"
               name="taxType"
+              value={formData.taxType}
               onChange={handleChange}
               required
               options={["VAT", "NON-VAT"]}
             />
-          </Section>
+          </FormSection>
 
-          <Section title="3. Booklet & Serial Information">
-            <Input label="No. of Booklets" name="noOfBooklets" type="number" onChange={handleChange} required />
+          <FormSection
+            number="03"
+            title="Booklet & Serial Information"
+            description="Enter quantity, copies per set, and serial range."
+          >
+            <Input
+              label="No. of Booklets"
+              name="noOfBooklets"
+              type="number"
+              value={formData.noOfBooklets}
+              onChange={handleChange}
+              required
+            />
 
             <Select
               label="No. of Sets Per Booklet"
               name="setsPerBooklet"
+              value={formData.setsPerBooklet}
               onChange={handleChange}
               required
               options={["50"]}
@@ -138,36 +270,51 @@ export default function ReceivedATPPage() {
             <Select
               label="No. of Copies Per Set"
               name="copiesPerSet"
+              value={formData.copiesPerSet}
               onChange={handleChange}
               required
               options={["2", "3", "4", "5", "6", "7", "OTHER"]}
             />
 
             {formData.copiesPerSet === "OTHER" && (
-              <Input label="Specify Copies Per Set" name="copiesPerSetOther" type="number" onChange={handleChange} required />
+              <Input
+                label="Specify Copies Per Set"
+                name="copiesPerSetOther"
+                type="number"
+                value={formData.copiesPerSetOther}
+                onChange={handleChange}
+                required
+              />
             )}
 
             <Input
-              label="Serial Numbers (From-To)"
+              label="Serial Numbers"
               name="serialNumbers"
               placeholder="Example: 000001-000500"
+              value={formData.serialNumbers}
               onChange={handleChange}
               required
             />
-          </Section>
+          </FormSection>
 
-          <Section title="4. ATP Received & Sales Assigned">
+          <FormSection
+            number="04"
+            title="ATP Received & Staff Assignment"
+            description="Record ATP source and assigned sales/staff name."
+          >
             <Select
               label="ATP Received"
               name="atpReceived"
+              value={formData.atpReceived}
               onChange={handleChange}
               required
-              options={["ORIGINAL", "PHOTOCOPY"]}
+              options={["ORIGINAL", "PHOTOCOPY", "ORUS ATP"]}
             />
 
             <Select
               label="Sales Assigned"
               name="salesAssigned"
+              value={formData.salesAssigned}
               onChange={handleChange}
               required
               options={[
@@ -187,41 +334,75 @@ export default function ReceivedATPPage() {
             />
 
             {formData.salesAssigned === "OTHERS" && (
-              <Input label="Specify Sales Assigned" name="salesAssignedOther" onChange={handleChange} required />
+              <Input
+                label="Specify Sales Assigned"
+                name="salesAssignedOther"
+                value={formData.salesAssignedOther}
+                onChange={handleChange}
+                required
+              />
             )}
-          </Section>
+          </FormSection>
 
-          <div className="flex gap-4">
-            <button
-              type="submit"
-              className="rounded-xl bg-yellow-400 px-8 py-3 font-bold text-black hover:bg-yellow-300"
-            >
-              Save ATP Record
-            </button>
+          <div className="sticky bottom-0 z-20 -mx-6 border-t border-[#e3d8c7] bg-[#fffaf2]/95 px-6 py-5 backdrop-blur lg:-mx-8 lg:px-8">
+            <div className="mx-auto flex max-w-[1400px] flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <p className="text-xs text-[#7c6a56]">
+                Saving this form will create a Trello ATP intake card.
+                Production details will be completed in the next workflow step.
+              </p>
 
-            <button
-              type="reset"
-              className="rounded-xl border border-zinc-700 px-8 py-3 font-bold text-zinc-300 hover:bg-zinc-900"
-            >
-              Clear Form
-            </button>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="rounded-xl border border-[#dfd4c4] bg-white px-6 py-3 text-sm font-bold text-[#3f352a] hover:bg-[#fbf7ef]"
+                >
+                  Clear Form
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="rounded-xl bg-[#e1bb5f] px-8 py-3 text-sm font-black text-black hover:bg-[#edca73] disabled:opacity-60"
+                >
+                  {saving ? "Saving..." : "Save ATP Record"}
+                </button>
+              </div>
+            </div>
           </div>
         </form>
+
+        <footer className="mt-10 text-center text-xs text-[#7c6a56]">
+          © 2026 LIC Printing Shop. Production Management System.
+        </footer>
       </div>
-    </main>
+    </AppShell>
   );
 }
-
-function Section({
+function FormSection({
+  number,
   title,
+  description,
   children,
 }: {
+  number: string;
   title: string;
+  description: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-zinc-800 bg-[#0D1118] p-6">
-      <h2 className="mb-5 text-xl font-bold text-yellow-400">{title}</h2>
+    <section className="rounded-2xl border border-[#e3d8c7] bg-white p-6 shadow-[0_2px_10px_rgba(70,45,20,0.08)]">
+      <div className="mb-6 flex items-start gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#f8ead3] text-sm font-black text-[#8b5e24]">
+          {number}
+        </div>
+
+        <div>
+          <h2 className="text-xl font-black text-black">{title}</h2>
+          <p className="mt-1 text-sm text-[#6f6254]">{description}</p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">{children}</div>
     </section>
   );
@@ -230,6 +411,7 @@ function Section({
 function Input({
   label,
   name,
+  value,
   type = "text",
   placeholder = "",
   required = false,
@@ -237,6 +419,7 @@ function Input({
 }: {
   label: string;
   name: string;
+  value: string;
   type?: string;
   placeholder?: string;
   required?: boolean;
@@ -244,17 +427,18 @@ function Input({
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm text-zinc-400">
-        {label} {required && <span className="text-red-400">*</span>}
+      <label className="mb-2 block text-sm font-semibold text-[#3f352a]">
+        {label} {required && <span className="text-red-500">*</span>}
       </label>
 
       <input
         type={type}
         name={name}
+        value={value}
         placeholder={placeholder}
         required={required}
         onChange={onChange}
-        className="w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 outline-none focus:border-yellow-400"
+        className="w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition placeholder:text-[#a99b8c] focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
       />
     </div>
   );
@@ -263,26 +447,29 @@ function Input({
 function Textarea({
   label,
   name,
+  value,
   required = false,
   onChange,
 }: {
   label: string;
   name: string;
+  value: string;
   required?: boolean;
   onChange: React.ChangeEventHandler<HTMLTextAreaElement>;
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm text-zinc-400">
-        {label} {required && <span className="text-red-400">*</span>}
+      <label className="mb-2 block text-sm font-semibold text-[#3f352a]">
+        {label} {required && <span className="text-red-500">*</span>}
       </label>
 
       <textarea
         name={name}
+        value={value}
         required={required}
         onChange={onChange}
         rows={3}
-        className="w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 outline-none focus:border-yellow-400"
+        className="w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition placeholder:text-[#a99b8c] focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
       />
     </div>
   );
@@ -291,27 +478,30 @@ function Textarea({
 function Select({
   label,
   name,
+  value,
   options,
   required = false,
   onChange,
 }: {
   label: string;
   name: string;
+  value: string;
   options: string[];
   required?: boolean;
   onChange: React.ChangeEventHandler<HTMLSelectElement>;
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm text-zinc-400">
-        {label} {required && <span className="text-red-400">*</span>}
+      <label className="mb-2 block text-sm font-semibold text-[#3f352a]">
+        {label} {required && <span className="text-red-500">*</span>}
       </label>
 
       <select
         name={name}
+        value={value}
         required={required}
         onChange={onChange}
-        className="w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 outline-none focus:border-yellow-400"
+        className="w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
       >
         <option value="">Select</option>
         {options.map((option) => (
