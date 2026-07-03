@@ -45,7 +45,9 @@ export async function POST(req: Request) {
 
     const trackingNumber = body.trackingNumber || generateTrackingNumber();
 
-    const cardName = `(AY) ${body.businessName}
+    const salesAssigned = body.salesAssigned?.trim() || "-";
+
+    const cardName = `(${salesAssigned}) ${body.businessName}
 ${body.description}-${body.booklets}
 ${formatDateForTitle(body.dateReceived)}
 (NON-BIR)`;
@@ -67,7 +69,7 @@ Serial Numbers
 ${body.serialNumbers || "-"}
 
 Sales Assigned
-${body.salesAssigned || "-"}
+${salesAssigned}
 
 Order Type
 NON-BIR
@@ -105,7 +107,7 @@ NON-BIR
       body.description,
       body.booklets,
       body.serialNumbers || "",
-      body.salesAssigned || "",
+      salesAssigned,
       trelloCard.id,
     ]);
 
