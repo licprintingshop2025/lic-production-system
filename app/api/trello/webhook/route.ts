@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { runProductionSync } from "@/lib/productionSyncEngine";
 
 export async function HEAD() {
   return new NextResponse(null, { status: 200 });
@@ -15,14 +16,23 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    console.log("Trello webhook received:", {
-      actionType: body.action?.type,
-      cardName: body.action?.data?.card?.name,
-      listBefore: body.action?.data?.listBefore?.name,
-      listAfter: body.action?.data?.listAfter?.name,
-    });
+    const actionType = body.action?.type;
 
-    return NextResponse.json({ success: true });
+    if (actionType !== "updateCard") {
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        reason: "Not a card update.",
+      });
+    }
+
+    const result = await runProductionSync();
+
+    return NextResponse.json({
+      success: true,
+      trigger: "trello-webhook",
+      result,
+    });
   } catch (error) {
     return NextResponse.json(
       {
