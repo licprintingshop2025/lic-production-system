@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { appendReceivedATPRow } from "@/lib/googleSheets";
 import { getPHDateTime } from "@/lib/dateTime";
+import { generateTrackingNumber } from "@/lib/tracking";
 
 function generateTrackingNumber() {
   const now = new Date();

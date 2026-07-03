@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { appendNonBIROrderRow } from "@/lib/googleSheets";
+import { generateTrackingNumber } from "@/lib/tracking";
 
 type NonBIROrderPayload = {
   trackingNumber: string;
@@ -10,22 +11,6 @@ type NonBIROrderPayload = {
   serialNumbers: string;
   salesAssigned: string;
 };
-
-function generateTrackingNumber() {
-  const now = new Date();
-  const year = String(now.getFullYear()).slice(-2);
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let random = "";
-
-  for (let i = 0; i < 6; i++) {
-    random += chars[Math.floor(Math.random() * chars.length)];
-  }
-
-  return `NB${year}${month}${day}${random}`;
-}
 
 function formatDateForTitle(dateString: string) {
   const date = new Date(dateString);
