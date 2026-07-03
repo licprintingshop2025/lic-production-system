@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getPHDate, getPHDateTime } from "@/lib/dateTime";
 import {
   getDailyAssignmentsRows,
   replaceDailyAssignmentsRows,
@@ -14,7 +15,7 @@ type Assignment = {
 };
 
 function getTodayDate() {
-  return new Date().toLocaleDateString();
+  return getPHDate();
 }
 
 export async function GET() {
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
     }
 
     const date = getTodayDate();
-    const generatedTime = new Date().toLocaleString();
+    const generatedTime = getPHDateTime();
 
     const rows = assignments.map((item) => [
       date,

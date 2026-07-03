@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { appendReceivedATPRow } from "@/lib/googleSheets";
+import { getPHDateTime } from "@/lib/dateTime";
 
 function generateTrackingNumber() {
   const now = new Date();
@@ -193,7 +194,7 @@ ${atpStatus || "-"}
 
     try {
       const rowData = [
-        new Date().toLocaleString(),
+        getPHDateTime(),
         trackingNo,
         body.dateOfAtp,
         clean(body.ocn),

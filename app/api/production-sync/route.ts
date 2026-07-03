@@ -1,3 +1,4 @@
+import { formatPHDateTime } from "@/lib/dateTime";
 import { NextResponse } from "next/server";
 import {
   appendBIRProductionRecord,
@@ -307,14 +308,14 @@ export async function GET() {
           const completedDateRaw = findFirstMoveInto(actions, COMPLETED_LIST);
 
           const productionStarted = productionStartedRaw
-            ? new Date(productionStartedRaw).toLocaleString()
+            ? formatPHDateTime(productionStartedRaw)
             : "";
 
           const completedDate = completedDateRaw
-            ? new Date(completedDateRaw).toLocaleString()
+            ? formatPHDateTime(completedDateRaw)
             : "";
 
-          const releasedDate = new Date(releasedDateRaw).toLocaleString();
+          const releasedDate = formatPHDateTime(releasedDateRaw);
 
           const finalStatus = currentList;
 
