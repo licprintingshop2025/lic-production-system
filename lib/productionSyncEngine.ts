@@ -313,7 +313,7 @@ export async function runProductionSync() {
 
           const productionTime =
             productionStarted && completedDate
-              ? calculateProductionTime(productionStarted, completedDate)
+              ? calculateProductionTime(productionStartedRaw, completedDateRaw)
               : "";
 
           if (receivedATP) {

@@ -85,7 +85,8 @@ export async function POST(req: Request) {
 
     const tradeName = clean(body.businessName || body.taxpayerName);
     const branchNo = clean(body.branchNo);
-    const rdoCode = clean(body.rdoCode);
+    const rdoCode = clean(body.rdoCode).padStart(3, "0");
+    const rdoCodeForSheet = rdoCode ? `'${rdoCode}` : "";
     const taxType = clean(body.taxType);
     const dateOfAtp = formatDate(body.dateOfAtp);
     const atpStatus = clean(body.atpStatus || body.atpReceived || "ATP");
@@ -186,7 +187,7 @@ ${atpStatus || "-"}
         clean(body.taxpayerName),
         tradeName,
         clean(body.registeredAddress),
-        `'${rdoCode}`,
+        rdoCodeForSheet,
         clean(body.mannerDocType),
         receiptType,
         taxType,

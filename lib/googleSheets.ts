@@ -104,7 +104,7 @@ export async function appendNonBIRProductionRecord(row: unknown[]) {
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
     range: "'Non-BIR Production Records'!A:L",
-    valueInputOption: "USER_ENTERED",
+    valueInputOption: "RAW",
     requestBody: {
       values: [row],
     },
@@ -259,7 +259,7 @@ export async function appendNonBIROrderRow(row: (string | number)[]) {
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
     range: "'Non-BIR Orders'!A:H",
-    valueInputOption: "USER_ENTERED",
+    valueInputOption: "RAW",
     requestBody: {
       values: [row],
     },
