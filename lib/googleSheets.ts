@@ -158,18 +158,22 @@ export function calculateProductionTime(startDate: string, completedDate: string
   }
 
   const diffMs = completed.getTime() - start.getTime();
-  const diffHours = diffMs / (1000 * 60 * 60);
 
-  if (diffHours < 0) return "";
+  if (diffMs < 0) return "";
 
-  if (diffHours < 24) {
-    return `${diffHours.toFixed(2)} hrs`;
-  }
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
 
-  const days = Math.floor(diffHours / 24);
-  const hours = Math.round(diffHours % 24);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
 
-  return `${days} day(s) ${hours} hr(s)`;
+  const parts: string[] = [];
+
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+
+  return parts.join(" ");
 }
 
 export type EmployeeInput = {
