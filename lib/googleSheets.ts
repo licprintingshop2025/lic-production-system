@@ -27,7 +27,7 @@ export async function appendReceivedATPRow(row: (string | number)[]) {
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
     range: `'${sheetTab}'!A:S`,
-    valueInputOption: "USER_ENTERED",
+    valueInputOption: "RAW",
     requestBody: {
       values: [row],
     },
@@ -40,7 +40,7 @@ export async function appendDailyAssignmentsRows(rows: (string | number)[][]) {
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
     range: "'Daily Assignments'!A:F",
-    valueInputOption: "USER_ENTERED",
+    valueInputOption: "RAW",
     requestBody: {
       values: rows,
     },
@@ -91,7 +91,7 @@ export async function appendBIRProductionRecord(row: unknown[]) {
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
     range: "'BIR Production Records'!A:W",
-    valueInputOption: "USER_ENTERED",
+    valueInputOption: "RAW",
     requestBody: {
       values: [row],
     },
