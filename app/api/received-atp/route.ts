@@ -3,23 +3,6 @@ import { appendReceivedATPRow } from "@/lib/googleSheets";
 import { getPHDateTime } from "@/lib/dateTime";
 import { generateTrackingNumber } from "@/lib/tracking";
 
-function generateTrackingNumber() {
-  const now = new Date();
-
-  const year = now.getFullYear().toString().slice(-2);
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let random = "";
-
-  for (let i = 0; i < 12; i++) {
-    random += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-
-  return `LIC-${year}-${month}${day}-${random}`;
-}
-
 function formatDate(dateValue: string) {
   if (!dateValue) return "-";
 
