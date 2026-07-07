@@ -3,23 +3,23 @@
 import { useState } from "react";
 import AppShell from "../components/AppShell";
 import PageHeader from "../components/PageHeader";
+import DocumentItemCard, {
+  createEmptyDocument,
+  type DocumentItem,
+} from "../components/forms/DocumentItemCard";
 
 type FormData = {
   dateReceived: string;
   businessName: string;
-  description: string;
-  booklets: string;
-  serialNumbers: string;
   salesAssigned: string;
+  documents: DocumentItem[];
 };
 
 const initialFormData: FormData = {
   dateReceived: "",
   businessName: "",
-  description: "",
-  booklets: "",
-  serialNumbers: "",
   salesAssigned: "",
+  documents: [createEmptyDocument()],
 };
 
 export default function NonBIROrdersPage() {
@@ -34,6 +34,52 @@ export default function NonBIROrdersPage() {
       ...formData,
       [e.target.name]: e.target.value,
     });
+  }
+
+  function handleDocumentChange(
+    id: string,
+    field: keyof DocumentItem,
+    value: string
+  ) {
+    setFormData((current) => ({
+      ...current,
+      documents: current.documents.map((doc) =>
+        doc.id === id ? { ...doc, [field]: value } : doc
+      ),
+    }));
+  }
+
+  function handleAddDocument() {
+    setFormData((current) => ({
+      ...current,
+      documents: [...current.documents, createEmptyDocument()],
+    }));
+  }
+
+  function handleRemoveDocument(id: string) {
+    setFormData((current) => ({
+      ...current,
+      documents:
+        current.documents.length === 1
+          ? current.documents
+          : current.documents.filter((doc) => doc.id !== id),
+    }));
+  }
+
+  function joinDocuments(
+    field: keyof DocumentItem,
+    fallbackField?: keyof DocumentItem
+  ) {
+    return formData.documents
+      .map((doc) => {
+        if (fallbackField && doc[field] === "OTHER") {
+          return doc[fallbackField];
+        }
+
+        return doc[field];
+      })
+      .filter(Boolean)
+      .join(" / ");
   }
 
   function handleReset() {
@@ -53,7 +99,14 @@ export default function NonBIROrdersPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+
+          // old API-compatible fields
+          description: joinDocuments("description", "descriptionOther"),
+          booklets: joinDocuments("booklets"),
+          serialNumbers: joinDocuments("serialNumbers"),
+        }),
       });
 
       const result = await response.json();
@@ -130,34 +183,30 @@ export default function NonBIROrdersPage() {
           </section>
 
           <section className="rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-black">Printing Details</h2>
+            <h2 className="text-xl font-bold text-black">Documents Included</h2>
+            <p className="mt-1 text-sm text-[#6f6254]">
+              Add one or more Non-BIR document orders under the same tracking number.
+            </p>
 
-            <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
-              <Input
-                label="Description / Kind of Invoice or Receipt"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                required
-              />
-
-              <Input
-                label="No. of Booklets"
-                name="booklets"
-                value={formData.booklets}
-                onChange={handleChange}
-                required
-              />
-
-              <div className="md:col-span-2">
-                <Input
-                  label="Serial Numbers (From-To)"
-                  name="serialNumbers"
-                  value={formData.serialNumbers}
-                  onChange={handleChange}
-                  placeholder="Example: 0001-0200"
+            <div className="mt-6 space-y-5">
+              {formData.documents.map((document, index) => (
+                <DocumentItemCard
+                  key={document.id}
+                  document={document}
+                  index={index}
+                  canRemove={formData.documents.length > 1}
+                  onChange={handleDocumentChange}
+                  onRemove={handleRemoveDocument}
                 />
-              </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={handleAddDocument}
+                className="rounded-xl border border-[#d6b46a] bg-white px-5 py-3 text-sm font-black text-[#8b5e24] hover:bg-[#fff7e6]"
+              >
+                + Add Another Document
+              </button>
             </div>
           </section>
 

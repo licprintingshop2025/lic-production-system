@@ -3,6 +3,10 @@
 import { useState } from "react";
 import AppShell from "../components/AppShell";
 import PageHeader from "../components/PageHeader";
+import DocumentItemCard, {
+  createEmptyDocument,
+  type DocumentItem,
+} from "../components/forms/DocumentItemCard";
 
 type FormData = {
   dateOfAtp: string;
@@ -12,15 +16,8 @@ type FormData = {
   businessName: string;
   registeredAddress: string;
   rdoCode: string;
-  mannerDocType: string;
-  receiptType: string;
-  receiptTypeOther: string;
   taxType: string;
-  noOfBooklets: string;
-  setsPerBooklet: string;
-  copiesPerSet: string;
-  copiesPerSetOther: string;
-  serialNumbers: string;
+  documents: DocumentItem[];
   atpReceived: string;
   salesAssigned: string;
   salesAssignedOther: string;
@@ -34,15 +31,8 @@ const initialFormData: FormData = {
   businessName: "",
   registeredAddress: "",
   rdoCode: "",
-  mannerDocType: "",
-  receiptType: "",
-  receiptTypeOther: "",
   taxType: "",
-  noOfBooklets: "",
-  setsPerBooklet: "50",
-  copiesPerSet: "",
-  copiesPerSetOther: "",
-  serialNumbers: "",
+  documents: [createEmptyDocument()],
   atpReceived: "",
   salesAssigned: "",
   salesAssignedOther: "",
@@ -64,6 +54,52 @@ export default function ReceivedATPPage() {
     });
   }
 
+  function handleDocumentChange(
+    id: string,
+    field: keyof DocumentItem,
+    value: string
+  ) {
+    setFormData((current) => ({
+      ...current,
+      documents: current.documents.map((doc) =>
+        doc.id === id ? { ...doc, [field]: value } : doc
+      ),
+    }));
+  }
+
+  function handleAddDocument() {
+    setFormData((current) => ({
+      ...current,
+      documents: [...current.documents, createEmptyDocument()],
+    }));
+  }
+
+  function handleRemoveDocument(id: string) {
+    setFormData((current) => ({
+      ...current,
+      documents:
+        current.documents.length === 1
+          ? current.documents
+          : current.documents.filter((doc) => doc.id !== id),
+    }));
+  }
+
+  function joinDocuments(
+    field: keyof DocumentItem,
+    fallbackField?: keyof DocumentItem
+  ) {
+    return formData.documents
+      .map((doc) => {
+        if (fallbackField && doc[field] === "OTHER") {
+          return doc[fallbackField];
+        }
+
+        return doc[field];
+      })
+      .filter(Boolean)
+      .join(" / ");
+  }
+
   function handleReset() {
     setFormData(initialFormData);
     setSavedTrackingNo("");
@@ -81,7 +117,19 @@ export default function ReceivedATPPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+
+          // old API-compatible fields
+          mannerDocType: joinDocuments("manner"),
+          receiptType: joinDocuments("description", "descriptionOther"),
+          receiptTypeOther: "",
+          noOfBooklets: joinDocuments("booklets"),
+          setsPerBooklet: joinDocuments("setsPerBooklet"),
+          copiesPerSet: joinDocuments("copiesPerSet", "copiesPerSetOther"),
+          copiesPerSetOther: "",
+          serialNumbers: joinDocuments("serialNumbers"),
+        }),
       });
 
       const result = await response.json();
@@ -191,49 +239,9 @@ export default function ReceivedATPPage() {
 
           <FormSection
             number="02"
-            title="Document Information"
-            description="Define receipt or invoice type, tax type, and document manner."
+            title="Documents Included"
+            description="Add one or more invoice or receipt documents under the same ATP order."
           >
-            <Select
-              label="Manner / Doc Type"
-              name="mannerDocType"
-              value={formData.mannerDocType}
-              onChange={handleChange}
-              required
-              options={["BOUND", "LOOSE"]}
-            />
-
-            <Select
-              label="Description / Kind of Invoice or Receipt"
-              name="receiptType"
-              value={formData.receiptType}
-              onChange={handleChange}
-              required
-              options={[
-                "SALES INVOICE",
-                "SERVICE INVOICE",
-                "BILLING INVOICE",
-                "VAT INVOICE",
-                "NON-VAT INVOICE",
-                "INVOICE",
-                "OFFICIAL RECEIPT",
-                "COLLECTION RECEIPT",
-                "DELIVERY RECEIPT",
-                "ACKNOWLEDGEMENT RECEIPT",
-                "OTHER",
-              ]}
-            />
-
-            {formData.receiptType === "OTHER" && (
-              <Input
-                label="Specify Other Receipt Type"
-                name="receiptTypeOther"
-                value={formData.receiptTypeOther}
-                onChange={handleChange}
-                required
-              />
-            )}
-
             <Select
               label="Tax Type"
               name="taxType"
@@ -242,63 +250,31 @@ export default function ReceivedATPPage() {
               required
               options={["VAT", "NON-VAT"]}
             />
+
+            <div className="md:col-span-2 space-y-5">
+              {formData.documents.map((document, index) => (
+                <DocumentItemCard
+                  key={document.id}
+                  document={document}
+                  index={index}
+                  canRemove={formData.documents.length > 1}
+                  onChange={handleDocumentChange}
+                  onRemove={handleRemoveDocument}
+                />
+              ))}
+
+              <button
+                type="button"
+                onClick={handleAddDocument}
+                className="rounded-xl border border-[#d6b46a] bg-white px-5 py-3 text-sm font-black text-[#8b5e24] hover:bg-[#fff7e6]"
+              >
+                + Add Another Document
+              </button>
+            </div>
           </FormSection>
 
           <FormSection
             number="03"
-            title="Booklet & Serial Information"
-            description="Enter quantity, copies per set, and serial range."
-          >
-            <Input
-              label="No. of Booklets"
-              name="noOfBooklets"
-              type="number"
-              value={formData.noOfBooklets}
-              onChange={handleChange}
-              required
-            />
-
-            <Select
-              label="No. of Sets Per Booklet"
-              name="setsPerBooklet"
-              value={formData.setsPerBooklet}
-              onChange={handleChange}
-              required
-              options={["50"]}
-            />
-
-            <Select
-              label="No. of Copies Per Set"
-              name="copiesPerSet"
-              value={formData.copiesPerSet}
-              onChange={handleChange}
-              required
-              options={["2", "3", "4", "5", "6", "7", "OTHER"]}
-            />
-
-            {formData.copiesPerSet === "OTHER" && (
-              <Input
-                label="Specify Copies Per Set"
-                name="copiesPerSetOther"
-                type="number"
-                value={formData.copiesPerSetOther}
-                onChange={handleChange}
-                required
-              />
-            )}
-
-            <Input
-              label="Serial Numbers"
-              name="serialNumbers"
-              placeholder="Example: 000001-000500"
-              value={formData.serialNumbers}
-              onChange={handleChange}
-              required
-            />
-          </FormSection>
-
-          <FormSection
-            number="04"
             title="ATP Received & Staff Assignment"
             description="Record ATP source and assigned sales/staff name."
           >
