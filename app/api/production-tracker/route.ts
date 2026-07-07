@@ -68,9 +68,14 @@ function extractValue(desc: string, labels: string[]) {
   return "-";
 }
 
-function extractNumber(value: string) {
-  const match = value.match(/\d+/);
-  return match ? Number(match[0]) : 0;
+function extractTotalBooklets(value: string) {
+  const numbers = value.match(/\d+/g);
+
+  if (!numbers) return 0;
+
+  return numbers.reduce((total, number) => {
+    return total + Number(number);
+  }, 0);
 }
 
 function hasLabel(card: TrelloCard, labelName: string) {
@@ -221,33 +226,30 @@ async function buildTrackerRow(card: TrelloCard, stationName: string) {
       );
 
   const qtyRaw = isNonBir
-    ? prefer(
-        nonBirRow[4],
-        extractValue(desc, ["QTY", "QUANTITY", "NO. OF BOOKLETS"])
-      )
-    : prefer(
-        birRow[12],
-        birRow[11],
-        extractValue(desc, ["QTY", "QUANTITY", "NO. OF BOOKLETS"])
-      );
+  ? prefer(
+      nonBirRow[4],
+      extractValue(desc, ["QTY", "QUANTITY", "NO. OF BOOKLETS"])
+    )
+  : prefer(
+      birRow[12], // No. of Booklets
+      extractValue(desc, ["QTY", "QUANTITY", "NO. OF BOOKLETS"])
+    );
 
-  const booklets = extractNumber(qtyRaw);
+  const booklets = extractTotalBooklets(qtyRaw);
 
   const serial = isNonBir
-    ? prefer(nonBirRow[5], extractValue(desc, ["SERIAL", "SERIAL NUMBERS"]))
-    : prefer(
-        birRow[15],
-        birRow[14],
-        extractValue(desc, ["SERIAL", "SERIAL NUMBERS"])
-      );
+  ? prefer(nonBirRow[5], extractValue(desc, ["SERIAL", "SERIAL NUMBERS"]))
+  : prefer(
+      birRow[15], // Serial Numbers
+      extractValue(desc, ["SERIAL", "SERIAL NUMBERS"])
+    );
 
   const receiptType = isNonBir
-    ? prefer(nonBirRow[3], extractValue(desc, ["DOCUMENT", "DESCRIPTION"]))
-    : prefer(
-        birRow[10],
-        birRow[9],
-        extractValue(desc, ["DOCUMENT", "RECEIPT TYPE", "TYPE OF RECEIPT"])
-      );
+  ? prefer(nonBirRow[3], extractValue(desc, ["DOCUMENT", "DESCRIPTION"]))
+  : prefer(
+      birRow[10], // Description / Kind of Invoice or Receipt
+      extractValue(desc, ["DOCUMENT", "RECEIPT TYPE", "TYPE OF RECEIPT"])
+    );
 
   const paperType = prefer(
     extractValue(desc, ["PAPER", "PAPER TYPE"]),

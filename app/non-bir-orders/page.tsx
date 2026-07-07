@@ -5,8 +5,9 @@ import AppShell from "../components/AppShell";
 import PageHeader from "../components/PageHeader";
 import DocumentItemCard, {
   createEmptyDocument,
-  type DocumentItem,
-} from "../components/forms/DocumentItemCard";
+} from "@/app/components/forms/DocumentItemCard";
+
+import type { DocumentItem } from "@/lib/orders/types";
 
 type FormData = {
   dateReceived: string;
@@ -195,6 +196,7 @@ export default function NonBIROrdersPage() {
                   document={document}
                   index={index}
                   canRemove={formData.documents.length > 1}
+                  mode="non-bir"
                   onChange={handleDocumentChange}
                   onRemove={handleRemoveDocument}
                 />

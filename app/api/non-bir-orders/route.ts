@@ -1,36 +1,17 @@
 import { NextResponse } from "next/server";
 import { appendNonBIROrderRow } from "@/lib/googleSheets";
 import { generateTrackingNumber } from "@/lib/tracking";
-
-type NonBIROrderPayload = {
-  trackingNumber: string;
-  dateReceived: string;
-  businessName: string;
-  description: string;
-  booklets: string;
-  serialNumbers: string;
-  salesAssigned: string;
-};
-
-function formatDateForTitle(dateString: string) {
-  const date = new Date(dateString);
-
-  if (Number.isNaN(date.getTime())) {
-    return dateString.toUpperCase();
-  }
-
-  return date
-    .toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    })
-    .toUpperCase();
-}
+import type { NonBIROrder } from "@/lib/orders/types";
+import { clean, normalizeDocuments } from "@/lib/orders/utils";
+import {
+  buildNonBIRCardDescription,
+  buildNonBIRCardName,
+} from "@/lib/orders/trello";
+import { buildNonBIRRow } from "@/lib/orders/sheets";
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as NonBIROrderPayload;
+    const body = await req.json();
 
     const key = process.env.TRELLO_KEY;
     const token = process.env.TRELLO_TOKEN;
@@ -44,36 +25,25 @@ export async function POST(req: Request) {
     }
 
     const trackingNumber = body.trackingNumber || generateTrackingNumber();
+    const documents = normalizeDocuments(body.documents);
 
-    const salesAssigned = body.salesAssigned?.trim() || "-";
+    if (documents.length === 0) {
+      return NextResponse.json(
+        { error: "Please add at least one document." },
+        { status: 400 }
+      );
+    }
 
-    const cardName = `(${salesAssigned}) ${body.businessName}
-${body.description}-${body.booklets}
-${formatDateForTitle(body.dateReceived)}
-(NON-BIR)`;
+    const order: NonBIROrder = {
+      ...body,
+      trackingNumber,
+      businessName: clean(body.businessName),
+      salesAssigned: clean(body.salesAssigned) || "-",
+      documents,
+    };
 
-    const cardDesc = `
-Tracking Number
-${trackingNumber}
-
-Business
-${body.businessName}
-
-Description
-${body.description}
-
-Booklets
-${body.booklets}
-
-Serial Numbers
-${body.serialNumbers || "-"}
-
-Sales Assigned
-${salesAssigned}
-
-Order Type
-NON-BIR
-`.trim();
+    const cardName = buildNonBIRCardName(order);
+    const cardDesc = buildNonBIRCardDescription(order);
 
     const trelloRes = await fetch(
       `https://api.trello.com/1/cards?key=${key}&token=${token}`,
@@ -100,16 +70,7 @@ NON-BIR
 
     const trelloCard = await trelloRes.json();
 
-    await appendNonBIROrderRow([
-      trackingNumber,
-      body.dateReceived,
-      body.businessName,
-      body.description,
-      body.booklets,
-      body.serialNumbers || "",
-      salesAssigned,
-      trelloCard.id,
-    ]);
+    await appendNonBIROrderRow(buildNonBIRRow(order, trelloCard.id));
 
     return NextResponse.json({
       success: true,

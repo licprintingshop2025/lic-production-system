@@ -1,55 +1,13 @@
 import { NextResponse } from "next/server";
 import { appendReceivedATPRow } from "@/lib/googleSheets";
-import { getPHDateTime } from "@/lib/dateTime";
 import { generateTrackingNumber } from "@/lib/tracking";
-
-function formatDate(dateValue: string) {
-  if (!dateValue) return "-";
-
-  const date = new Date(dateValue);
-
-  if (Number.isNaN(date.getTime())) return dateValue.toUpperCase();
-
-  return date
-    .toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    })
-    .toUpperCase();
-}
-
-function clean(value: string | undefined | null) {
-  return value?.toString().trim() || "";
-}
-
-function getReceiptCode(receiptType: string) {
-  const value = receiptType.toUpperCase();
-
-  if (value.includes("SALES")) return "SALES";
-  if (value.includes("SERVICE")) return "SI";
-  if (value.includes("BILLING")) return "BI";
-  if (value.includes("COLLECTION")) return "CR";
-  if (value.includes("OFFICIAL")) return "OR";
-  if (value.includes("DELIVERY")) return "DR";
-  if (value.includes("ACKNOWLEDGEMENT")) return "AR";
-  if (value.includes("NON-VAT")) return "NVI";
-  if (value.includes("VAT")) return "VI";
-  if (value.includes("INVOICE")) return "INV";
-
-  return value || "DOC";
-}
-
-function buildOrderType(receiptType: string, booklets: string) {
-  const qty = booklets || "0";
-
-  return receiptType
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .map((item) => `${getReceiptCode(item)}-${qty}`)
-    .join(" ");
-}
+import type { ReceivedATPOrder } from "@/lib/orders/types";
+import { normalizeDocuments } from "@/lib/orders/utils";
+import {
+  buildReceivedATPCardDescription,
+  buildReceivedATPCardName,
+} from "@/lib/orders/trello";
+import { buildReceivedATPRow } from "@/lib/orders/sheets";
 
 export async function POST(req: Request) {
   try {
@@ -67,88 +25,23 @@ export async function POST(req: Request) {
     }
 
     const trackingNo = generateTrackingNumber();
+    const documents = normalizeDocuments(body.documents);
 
-    const staffName =
-      body.salesAssigned === "OTHERS"
-        ? clean(body.salesAssignedOther)
-        : clean(body.salesAssigned);
+    if (documents.length === 0) {
+      return NextResponse.json(
+        { error: "Please add at least one document." },
+        { status: 400 }
+      );
+    }
 
-    const receiptType =
-      body.receiptType === "OTHER"
-        ? clean(body.receiptTypeOther)
-        : clean(body.receiptType);
+    const order: ReceivedATPOrder = {
+      ...body,
+      trackingNo,
+      documents,
+    };
 
-    const copies =
-      body.copiesPerSet === "OTHER"
-        ? clean(body.copiesPerSetOther)
-        : clean(body.copiesPerSet);
-
-    const tradeName = clean(body.businessName || body.taxpayerName);
-    const branchNo = clean(body.branchNo);
-    const rdoCode = clean(body.rdoCode).padStart(3, "0");
-    const rdoCodeForSheet = rdoCode ? `'${rdoCode}` : "";
-    const taxType = clean(body.taxType);
-    const dateOfAtp = formatDate(body.dateOfAtp);
-    const atpStatus = clean(body.atpStatus || body.atpReceived || "ATP");
-    const booklets = clean(body.noOfBooklets);
-
-    const orderType = buildOrderType(receiptType, booklets);
-
-    const branchText = branchNo ? ` (BRANCH ${branchNo})` : "";
-    const rdoText = rdoCode ? ` (${rdoCode})` : "";
-
-    const cardName = `(${staffName || "NO STAFF"}) ${
-      tradeName || "NO TRADE NAME"
-    }${branchText}${rdoText}
-${orderType || "ORDER TYPE"}
-${taxType || "TAX TYPE"} ${dateOfAtp} (${atpStatus.toUpperCase()})`;
-
-    const description = `
-TRACKING:
-${trackingNo}
-
-TIN:
-${clean(body.tin) || "-"}
-
-OCN:
-${clean(body.ocn) || "-"}
-
-TAXPAYER:
-${clean(body.taxpayerName) || "-"}
-
-TRADE NAME:
-${tradeName || "-"}
-
-ADDRESS:
-${clean(body.registeredAddress) || "-"}
-
-DOCUMENT:
-${receiptType || "-"}
-
-MANNER:
-${clean(body.mannerDocType) || "-"}
-
-QTY:
-${booklets || "-"} Booklets
-
-SETS:
-${clean(body.setsPerBooklet) || "-"} per booklet
-
-COPIES:
-${copies || "-"} per set
-
-SERIAL:
-${clean(body.serialNumbers) || "-"}
-
-RDO:
-${rdoCode || "-"}
-
-TAX TYPE:
-${taxType || "-"}
-
-ATP STATUS:
-${atpStatus || "-"}
-`.trim();
+    const cardName = buildReceivedATPCardName(order);
+    const description = buildReceivedATPCardDescription(order);
 
     const response = await fetch(
       `https://api.trello.com/1/cards?key=${key}&token=${token}`,
@@ -178,30 +71,7 @@ ${atpStatus || "-"}
     const card = await response.json();
 
     try {
-      const rowData = [
-        getPHDateTime(),
-        trackingNo,
-        body.dateOfAtp,
-        clean(body.ocn),
-        clean(body.tin),
-        clean(body.taxpayerName),
-        tradeName,
-        clean(body.registeredAddress),
-        rdoCodeForSheet,
-        clean(body.mannerDocType),
-        receiptType,
-        taxType,
-        booklets,
-        clean(body.setsPerBooklet),
-        copies,
-        clean(body.serialNumbers),
-        atpStatus,
-        staffName,
-        card.id,
-      ];
-
-      await appendReceivedATPRow(rowData);
-      
+      await appendReceivedATPRow(buildReceivedATPRow(order, card.id));
     } catch (sheetError) {
       return NextResponse.json(
         {

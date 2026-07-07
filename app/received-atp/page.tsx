@@ -5,8 +5,9 @@ import AppShell from "../components/AppShell";
 import PageHeader from "../components/PageHeader";
 import DocumentItemCard, {
   createEmptyDocument,
-  type DocumentItem,
-} from "../components/forms/DocumentItemCard";
+} from "@/app/components/forms/DocumentItemCard";
+
+import type { DocumentItem } from "@/lib/orders/types";
 
 type FormData = {
   dateOfAtp: string;
@@ -117,19 +118,7 @@ export default function ReceivedATPPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          ...formData,
-
-          // old API-compatible fields
-          mannerDocType: joinDocuments("manner"),
-          receiptType: joinDocuments("description", "descriptionOther"),
-          receiptTypeOther: "",
-          noOfBooklets: joinDocuments("booklets"),
-          setsPerBooklet: joinDocuments("setsPerBooklet"),
-          copiesPerSet: joinDocuments("copiesPerSet", "copiesPerSetOther"),
-          copiesPerSetOther: "",
-          serialNumbers: joinDocuments("serialNumbers"),
-        }),
+        body: JSON.stringify(formData),
       });
 
       const result = await response.json();
@@ -258,6 +247,7 @@ export default function ReceivedATPPage() {
                   document={document}
                   index={index}
                   canRemove={formData.documents.length > 1}
+                  mode="received-atp"
                   onChange={handleDocumentChange}
                   onRemove={handleRemoveDocument}
                 />

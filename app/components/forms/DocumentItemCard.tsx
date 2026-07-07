@@ -1,19 +1,19 @@
-export type DocumentItem = {
-  id: string;
-  description: string;
-  descriptionOther: string;
-  manner: string;
-  booklets: string;
-  setsPerBooklet: string;
-  copiesPerSet: string;
-  copiesPerSetOther: string;
-  serialNumbers: string;
-};
+import {
+  COPIES_PER_SET_OPTIONS,
+  MANNER_TYPES,
+  RECEIPT_TYPES,
+  SETS_PER_BOOKLET_OPTIONS,
+} from "@/lib/orders/constants";
+
+import type { DocumentItem } from "@/lib/orders/types";
+
+type DocumentMode = "received-atp" | "non-bir";
 
 type Props = {
   document: DocumentItem;
   index: number;
   canRemove: boolean;
+  mode: DocumentMode;
   onChange: (id: string, field: keyof DocumentItem, value: string) => void;
   onRemove: (id: string) => void;
 };
@@ -36,13 +36,11 @@ export default function DocumentItemCard({
   document,
   index,
   canRemove,
+  mode,
   onChange,
   onRemove,
 }: Props) {
-  const descriptionValue =
-    document.description === "OTHER"
-      ? document.descriptionOther
-      : document.description;
+  const isReceivedATP = mode === "received-atp";
 
   return (
     <div className="rounded-2xl border border-[#e3d8c7] bg-[#fffaf2] p-5">
@@ -68,25 +66,13 @@ export default function DocumentItemCard({
           value={document.description}
           onChange={(value) => onChange(document.id, "description", value)}
           required
-          options={[
-            "SALES INVOICE",
-            "SERVICE INVOICE",
-            "BILLING INVOICE",
-            "VAT INVOICE",
-            "NON-VAT INVOICE",
-            "INVOICE",
-            "OFFICIAL RECEIPT",
-            "COLLECTION RECEIPT",
-            "DELIVERY RECEIPT",
-            "ACKNOWLEDGEMENT RECEIPT",
-            "OTHER",
-          ]}
+          options={RECEIPT_TYPES}
         />
 
         {document.description === "OTHER" && (
           <Input
             label="Specify Other Receipt Type"
-            value={document.descriptionOther}
+            value={document.descriptionOther || ""}
             onChange={(value) =>
               onChange(document.id, "descriptionOther", value)
             }
@@ -94,13 +80,15 @@ export default function DocumentItemCard({
           />
         )}
 
-        <Select
-          label="Manner / Doc Type"
-          value={document.manner}
-          onChange={(value) => onChange(document.id, "manner", value)}
-          required
-          options={["BOUND", "LOOSE", "MANUAL", "COMPUTERIZED"]}
-        />
+        {isReceivedATP && (
+          <Select
+            label="Manner / Doc Type"
+            value={document.manner || ""}
+            onChange={(value) => onChange(document.id, "manner", value)}
+            required
+            options={MANNER_TYPES}
+          />
+        )}
 
         <Input
           label="No. of Booklets"
@@ -110,26 +98,32 @@ export default function DocumentItemCard({
           required
         />
 
-        <Select
-          label="No. of Sets Per Booklet"
-          value={document.setsPerBooklet}
-          onChange={(value) => onChange(document.id, "setsPerBooklet", value)}
-          required
-          options={["25", "50", "100", "150", "200", "250", "500", "OTHER"]}
-        />
+        {isReceivedATP && (
+          <Select
+            label="No. of Sets Per Booklet"
+            value={document.setsPerBooklet || "50"}
+            onChange={(value) =>
+              onChange(document.id, "setsPerBooklet", value)
+            }
+            required
+            options={SETS_PER_BOOKLET_OPTIONS}
+          />
+        )}
 
-        <Select
-          label="No. of Copies Per Set"
-          value={document.copiesPerSet}
-          onChange={(value) => onChange(document.id, "copiesPerSet", value)}
-          required
-          options={["1", "2", "3", "4", "5", "6", "7", "OTHER"]}
-        />
+        {isReceivedATP && (
+          <Select
+            label="No. of Copies Per Set"
+            value={document.copiesPerSet || ""}
+            onChange={(value) => onChange(document.id, "copiesPerSet", value)}
+            required
+            options={COPIES_PER_SET_OPTIONS}
+          />
+        )}
 
-        {document.copiesPerSet === "OTHER" && (
+        {isReceivedATP && document.copiesPerSet === "OTHER" && (
           <Input
             label="Specify Copies Per Set"
-            value={document.copiesPerSetOther}
+            value={document.copiesPerSetOther || ""}
             type="number"
             onChange={(value) =>
               onChange(document.id, "copiesPerSetOther", value)
@@ -140,14 +134,13 @@ export default function DocumentItemCard({
 
         <Input
           label="Serial Numbers"
-          value={document.serialNumbers}
+          value={document.serialNumbers || ""}
           placeholder="Example: 000001-000500"
           onChange={(value) => onChange(document.id, "serialNumbers", value)}
           required
         />
       </div>
 
-      <input type="hidden" value={descriptionValue} readOnly />
     </div>
   );
 }
@@ -211,6 +204,7 @@ function Select({
         className="w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
       >
         <option value="">Select</option>
+
         {options.map((option) => (
           <option key={option} value={option}>
             {option}
