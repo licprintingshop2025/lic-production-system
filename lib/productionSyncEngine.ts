@@ -68,13 +68,15 @@ function isWeekend(date: Date) {
   return day === 0 || day === 6;
 }
 
-function calculateDueDateFromStart(startDate: string, priority: string) {
+function calculateDueDateFromStart(
+  startDate: string,
+  workingDays: number
+) {
   const date = new Date(startDate);
-  const workingDaysToAdd = priority.toLowerCase() === "rush" ? 3 : 10;
 
   let addedWorkingDays = 0;
 
-  while (addedWorkingDays < workingDaysToAdd) {
+  while (addedWorkingDays < workingDays) {
     date.setDate(date.getDate() + 1);
 
     if (!isWeekend(date)) {
@@ -83,6 +85,48 @@ function calculateDueDateFromStart(startDate: string, priority: string) {
   }
 
   return date.toISOString();
+}
+
+function extractDeliveryDueWorkingDays(desc: string) {
+  const isPartial =
+    /DELIVERY STRATEGY:\s*Partial Release/i.test(desc);
+
+  const initialMatch =
+    desc.match(/INITIAL DUE WD:\s*(\d+)/i);
+
+  const finalMatch =
+    desc.match(/FINAL DUE WD:\s*(\d+)/i);
+
+  if (isPartial && initialMatch) {
+    return Number(initialMatch[1]);
+  }
+
+  if (finalMatch) {
+    return Number(finalMatch[1]);
+  }
+
+  return 10;
+}
+
+function formatDateOnly(dateString: string) {
+  return new Date(dateString).toISOString().split("T")[0];
+}
+
+function replaceOrAddLine(desc: string, label: string, value: string) {
+  const regex = new RegExp(`${label}:.*`, "i");
+
+  if (regex.test(desc)) {
+    return desc.replace(regex, `${label}: ${value}`);
+  }
+
+  return `${desc.trim()}\n${label}: ${value}`;
+}
+
+function extractLineValue(desc: string, label: string) {
+  const regex = new RegExp(`${label}:\\s*([^\\n]+)`, "i");
+  const match = desc.match(regex);
+
+  return match?.[1]?.trim() || "";
 }
 
 function isOlderThanDays(dateString: string, days: number) {
@@ -187,6 +231,81 @@ async function ensureStatusChecklist(cardId: string, key: string, token: string)
   return true;
 }
 
+async function ensureInitialCommitmentChecklist(
+  card: TrelloCard,
+  key: string,
+  token: string
+) {
+  const isPartial =
+    /DELIVERY STRATEGY:\s*Partial Release/i.test(card.desc);
+
+  if (!isPartial) return false;
+
+  const checklists = await getCardChecklists(card.id, key, token);
+
+  const hasChecklist = checklists.some(
+    (checklist: { name: string }) =>
+      checklist.name.toUpperCase() === "INITIAL COMMITMENT"
+  );
+
+  if (hasChecklist) return false;
+
+  const createChecklistRes = await fetch(
+    `https://api.trello.com/1/checklists?key=${key}&token=${token}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        idCard: card.id,
+        name: "Initial Commitment",
+      }),
+    }
+  );
+
+  if (!createChecklistRes.ok) return false;
+
+  const checklist = await createChecklistRes.json();
+
+  await fetch(
+    `https://api.trello.com/1/checklists/${checklist.id}/checkItems?key=${key}&token=${token}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Initial Release Completed",
+        checked: false,
+      }),
+    }
+  );
+
+  return true;
+}
+
+async function isInitialCommitmentCompleted(
+  cardId: string,
+  key: string,
+  token: string
+) {
+  const checklists = await getCardChecklists(cardId, key, token);
+
+  for (const checklist of checklists as {
+    name: string;
+    checkItems?: { name: string; state: string }[];
+  }[]) {
+    if (checklist.name.toUpperCase() !== "INITIAL COMMITMENT") continue;
+
+    return (
+      checklist.checkItems?.some(
+        (item) =>
+          item.name.toUpperCase() === "INITIAL RELEASE COMPLETED" &&
+          item.state === "complete"
+      ) || false
+    );
+  }
+
+  return false;
+}
+
 async function setDueDateIfProductionStarted({
   card,
   currentList,
@@ -199,23 +318,155 @@ async function setDueDateIfProductionStarted({
   token: string;
 }) {
   if (!isInList(currentList, [PRODUCTION_START_LIST])) return false;
-  if (card.due) return false;
 
   const actions = await getCardMoveActions(card.id, key, token);
 
-  const station1StartedRaw =
-    findFirstMoveInto(actions, PRODUCTION_START_LIST) || new Date().toISOString();
+  const station1StartedRaw = findFirstMoveInto(
+    actions,
+    PRODUCTION_START_LIST
+  );
 
-  const priority = getPriorityFromLabels(card);
-  const dueDate = calculateDueDateFromStart(station1StartedRaw, priority);
+  if (!station1StartedRaw) return false;
 
+  const existingProductionStart = extractLineValue(
+    card.desc,
+    "PRODUCTION START"
+  );
+
+  const deliveryStrategyIsPartial =
+    /DELIVERY STRATEGY:\s*Partial Release/i.test(card.desc);
+
+  const initialDueMatch = card.desc.match(/INITIAL DUE WD:\s*(\d+)/i);
+  const finalDueMatch = card.desc.match(/FINAL DUE WD:\s*(\d+)/i);
+
+  const initialWorkingDays = initialDueMatch
+    ? Number(initialDueMatch[1])
+    : 10;
+
+  const finalWorkingDays = finalDueMatch
+    ? Number(finalDueMatch[1])
+    : initialWorkingDays;
+
+  const productionStartForDue = existingProductionStart &&
+    existingProductionStart !== "Not Started"
+    ? existingProductionStart
+    : station1StartedRaw;
+
+  const initialDueDate = calculateDueDateFromStart(
+    productionStartForDue,
+    initialWorkingDays
+  );
+
+  const finalDueDate = calculateDueDateFromStart(
+    productionStartForDue,
+    finalWorkingDays
+  );
+
+  const initialCommitmentCompleted = deliveryStrategyIsPartial
+  ? await isInitialCommitmentCompleted(card.id, key, token)
+  : false;
+
+const trelloDueDate =
+  deliveryStrategyIsPartial && !initialCommitmentCompleted
+    ? initialDueDate
+    : finalDueDate;
+
+  let updatedDesc = card.desc;
+
+  const productionStartValue =
+    existingProductionStart && existingProductionStart !== "Not Started"
+      ? existingProductionStart
+      : formatDateOnly(station1StartedRaw);
+
+  updatedDesc = replaceOrAddLine(
+    updatedDesc,
+    "PRODUCTION START",
+    productionStartValue
+  );
+
+  updatedDesc = replaceOrAddLine(
+    updatedDesc,
+    "INITIAL DUE DATE",
+    deliveryStrategyIsPartial ? formatDateOnly(initialDueDate) : "-"
+  );
+
+  updatedDesc = replaceOrAddLine(
+    updatedDesc,
+    "FINAL DUE DATE",
+    formatDateOnly(finalDueDate)
+  );
+
+  updatedDesc = replaceOrAddLine(
+    updatedDesc,
+    "INITIAL COMMITMENT STATUS",
+    deliveryStrategyIsPartial
+      ? initialCommitmentCompleted
+        ? "Completed"
+        : "Pending"
+      : "-"
+  );
+
+  const currentInitialDue = extractLineValue(
+    card.desc,
+    "INITIAL DUE DATE"
+  );
+
+  const currentFinalDue = extractLineValue(
+    card.desc,
+    "FINAL DUE DATE"
+  );
+
+  const currentProductionStart = extractLineValue(
+    card.desc,
+    "PRODUCTION START"
+  );
+
+  const currentCommitmentStatus = extractLineValue(
+    card.desc,
+    "INITIAL COMMITMENT STATUS"
+  );
+
+  const expectedInitialDue = deliveryStrategyIsPartial
+    ? formatDateOnly(initialDueDate)
+    : "-";
+
+  const expectedFinalDue = formatDateOnly(finalDueDate);
+
+  const expectedCommitmentStatus =
+    deliveryStrategyIsPartial
+      ? initialCommitmentCompleted
+        ? "Completed"
+        : "Pending"
+      : "-";
+
+  const descriptionAlreadyLatest =
+    currentProductionStart === productionStartValue &&
+    currentInitialDue === expectedInitialDue &&
+    currentFinalDue === expectedFinalDue &&
+    currentCommitmentStatus === expectedCommitmentStatus;
+
+  const currentDue =
+    card.due
+      ? formatDateOnly(card.due)
+      : "";
+
+  const expectedDue =
+    formatDateOnly(trelloDueDate);
+
+  if (
+    currentDue === expectedDue &&
+    descriptionAlreadyLatest
+  ) {
+    return false;
+  }
   const res = await fetch(
     `https://api.trello.com/1/cards/${card.id}?key=${key}&token=${token}`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        due: dueDate,
+        due: trelloDueDate,
+        desc: updatedDesc,
       }),
     }
   );
@@ -270,6 +521,11 @@ export async function runProductionSync() {
       });
 
       if (dueCreated) dueDatesCreated++;
+
+      if (isInList(currentList, [PRODUCTION_START_LIST])) {
+        const created = await ensureInitialCommitmentChecklist(card, key, token);
+        if (created) checklistsCreated++;
+      }
 
       if (isInList(currentList, CHECKLIST_REQUIRED_LISTS)) {
         const created = await ensureStatusChecklist(card.id, key, token);

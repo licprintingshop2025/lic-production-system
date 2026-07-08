@@ -17,7 +17,12 @@ type TrackerRow = {
   currentStation: string;
   arrivalDate: string;
   processingHours: number;
-  dueDate: string;
+  deliveryStrategy: string;
+  initialReleaseQty: number;
+  initialDueDate: string;
+  finalDueDate: string;
+  initialCommitmentStatus: string;
+  currentDueDate: string;
   daysRemaining: number;
   url: string;
 };
@@ -160,6 +165,7 @@ export default async function ProductionTrackerPage() {
                   <th className="p-4">Ply</th>
                   <th className="p-4">Size</th>
                   <th className="p-4">Priority</th>
+                  <th className="p-4">Delivery</th>
                   <th className="p-4">Station</th>
                   <th className="p-4">Arrival</th>
                   <th className="p-4">Proc. Hrs</th>
@@ -171,7 +177,7 @@ export default async function ProductionTrackerPage() {
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={15} className="p-8 text-center text-[#6f6254]">
+                    <td colSpan={16} className="p-8 text-center text-[#6f6254]">
                       No production records found.
                     </td>
                   </tr>
@@ -234,6 +240,23 @@ export default async function ProductionTrackerPage() {
                         </td>
 
                         <td className="p-4">
+                          {row.deliveryStrategy === "Partial Release" ? (
+                            <div>
+                              <span className="rounded-md bg-yellow-100 px-3 py-1 text-xs font-bold text-yellow-700">
+                                Partial
+                              </span>
+                              <p className="mt-1 text-xs text-[#6f6254]">
+                                {row.initialReleaseQty || 0} first
+                              </p>
+                            </div>
+                          ) : (
+                            <span className="rounded-md bg-green-100 px-3 py-1 text-xs font-bold text-green-700">
+                              Complete
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="p-4">
                           <span className="rounded-md border border-[#e6ddd1] bg-white px-3 py-1 text-xs font-semibold text-[#5f5448]">
                             {shortStation(row.currentStation)}
                           </span>
@@ -248,15 +271,38 @@ export default async function ProductionTrackerPage() {
                         </td>
 
                         <td className="p-4 font-semibold">
-                          {row.dueDate || "-"}
+                          {row.deliveryStrategy === "Partial Release" ? (
+                            <div className="space-y-1">
+                              <p>
+                                <span className="text-xs text-[#6f6254]">Initial:</span>{" "}
+                                {row.initialDueDate || "-"}
+                              </p>
+                              <p>
+                                <span className="text-xs text-[#6f6254]">Final:</span>{" "}
+                                {row.finalDueDate || "-"}
+                              </p>
+                            </div>
+                          ) : (
+                            row.finalDueDate || row.currentDueDate || "-"
+                          )}
                         </td>
 
                         <td className="p-4">
-                          <span
-                            className={`rounded-md px-3 py-1 text-xs font-bold ${daysBadge.className}`}
-                          >
-                            {daysBadge.text}
-                          </span>
+                          <div className="space-y-1">
+                            <span
+                              className={`inline-block rounded-md px-3 py-1 text-xs font-bold ${daysBadge.className}`}
+                            >
+                              {daysBadge.text}
+                            </span>
+
+                            {row.deliveryStrategy === "Partial Release" && (
+                              <div className="text-[10px] font-semibold text-[#6f6254]">
+                                {row.initialCommitmentStatus === "Completed"
+                                  ? "Final commitment"
+                                  : "Initial commitment"}
+                              </div>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

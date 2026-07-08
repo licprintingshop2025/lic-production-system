@@ -16,6 +16,11 @@ export default function CompleteProductionDetailsPage() {
     size: "",
     orderPriority: "",
     specialInstructions: "",
+
+    deliveryStrategy: "COMPLETE",
+    initialReleaseQty: "10",
+    initialDueWorkingDays: "10",
+    finalDueWorkingDays: "30",
   });
 
   const [loading, setLoading] = useState(false);
@@ -90,6 +95,7 @@ export default function CompleteProductionDetailsPage() {
               <Select
                 label="Paper Type"
                 name="paperType"
+                value={formData.paperType}
                 options={["Ordinary", "Carbonized"]}
                 onChange={handleChange}
                 required
@@ -98,6 +104,7 @@ export default function CompleteProductionDetailsPage() {
               <Select
                 label="Ply"
                 name="ply"
+                value={formData.ply}
                 options={["2-Ply", "3-Ply"]}
                 onChange={handleChange}
                 required
@@ -106,6 +113,7 @@ export default function CompleteProductionDetailsPage() {
               <Select
                 label="Size"
                 name="size"
+                value={formData.size}
                 options={["1/3", "1/4", "1/2", "Whole"]}
                 onChange={handleChange}
                 required
@@ -114,6 +122,7 @@ export default function CompleteProductionDetailsPage() {
               <Select
                 label="Order Priority"
                 name="orderPriority"
+                value={formData.orderPriority}
                 options={["Normal", "Rush"]}
                 onChange={handleChange}
                 required
@@ -126,12 +135,72 @@ export default function CompleteProductionDetailsPage() {
 
                 <textarea
                   name="specialInstructions"
+                  value={formData.specialInstructions}
                   onChange={handleChange}
                   rows={4}
                   placeholder="Enter special instructions, notes, or production reminders."
                   className="w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition placeholder:text-[#a99b8c] focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
                 />
               </div>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-[#e3d8c7] bg-white p-6 shadow-[0_2px_10px_rgba(70,45,20,0.08)]">
+            <div className="mb-6 flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#f8ead3] text-sm font-black text-[#8b5e24]">
+                02
+              </div>
+
+              <div>
+                <h2 className="text-xl font-black text-black">
+                  Delivery Commitment
+                </h2>
+                <p className="mt-1 text-sm text-[#6f6254]">
+                  Define how this order will be delivered to the client.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <Select
+                label="Delivery Strategy"
+                name="deliveryStrategy"
+                value={formData.deliveryStrategy}
+                options={["COMPLETE", "PARTIAL"]}
+                onChange={handleChange}
+                required
+              />
+
+              {formData.deliveryStrategy === "PARTIAL" && (
+                <>
+                  <Input
+                    label="Initial Release Quantity"
+                    name="initialReleaseQty"
+                    type="number"
+                    value={formData.initialReleaseQty}
+                    onChange={handleChange}
+                    required
+                  />
+
+                  <Input
+                    label="Initial Due (Working Days)"
+                    name="initialDueWorkingDays"
+                    type="number"
+                    value={formData.initialDueWorkingDays}
+                    onChange={handleChange}
+                    required
+                  />
+
+                  <Input
+                    label="Final Due (Working Days)"
+                    name="finalDueWorkingDays"
+                    type="number"
+                    value={formData.finalDueWorkingDays}
+                    onChange={handleChange}
+                    required
+                  />
+                </>
+              )}
             </div>
           </section>
 
@@ -186,15 +255,51 @@ export default function CompleteProductionDetailsPage() {
   );
 }
 
+function Input({
+  label,
+  name,
+  value,
+  type = "text",
+  required = false,
+  onChange,
+}: {
+  label: string;
+  name: string;
+  value: string;
+  type?: string;
+  required?: boolean;
+  onChange: React.ChangeEventHandler<HTMLInputElement>;
+}) {
+  return (
+    <div>
+      <label className="mb-2 block text-sm font-semibold text-[#3f352a]">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+
+      <input
+        name={name}
+        type={type}
+        value={value}
+        required={required}
+        onChange={onChange}
+        min={type === "number" ? 1 : undefined}
+        className="w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
+      />
+    </div>
+  );
+}
+
 function Select({
   label,
   name,
+  value,
   options,
   required = false,
   onChange,
 }: {
   label: string;
   name: string;
+  value: string;
   options: string[];
   required?: boolean;
   onChange: React.ChangeEventHandler<HTMLSelectElement>;
@@ -207,6 +312,7 @@ function Select({
 
       <select
         name={name}
+        value={value}
         required={required}
         onChange={onChange}
         className="w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
@@ -214,7 +320,11 @@ function Select({
         <option value="">Select</option>
         {options.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {option === "COMPLETE"
+              ? "Complete Order"
+              : option === "PARTIAL"
+              ? "Partial Release"
+              : option}
           </option>
         ))}
       </select>

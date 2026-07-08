@@ -27,12 +27,15 @@ type TrelloList = {
 
 type TrackerRow = {
   id: string;
+
   trackingNo: string;
   atpId: string;
   businessName: string;
+
   orderQuantity: number;
   serial: string;
   receiptType: string;
+
   paperType: string;
   ply: string;
   size: string;
@@ -40,8 +43,13 @@ type TrackerRow = {
   currentStation: string;
   arrivalDate: string;
   processingHours: number;
-  dueDate: string;
+  deliveryStrategy: string;
+  initialReleaseQty: number;
+  initialDueDate: string;
+  finalDueDate: string;
+  currentDueDate: string;
   daysRemaining: number;
+  initialCommitmentStatus: string;
   url: string;
 };
 
@@ -85,6 +93,12 @@ function extractBookletItems(value: string) {
   if (!numbers) return [];
 
   return numbers.map((number) => Number(number));
+}
+
+function extractNumber(value: string) {
+  const match = value.match(/\d+/);
+
+  return match ? Number(match[0]) : 0;
 }
 
 function hasLabel(card: TrelloCard, labelName: string) {
@@ -264,6 +278,41 @@ async function buildTrackerRow(card: TrelloCard, stationName: string) {
 
   const specialInstruction = extractValue(desc, ["SPECIAL INSTRUCTION", "SPECIAL INSTRUCTIONS", "SPECIAL"]) || "";
 
+  const deliveryStrategy = prefer(
+    extractValue(desc, ["DELIVERY STRATEGY"]),
+    "Complete Order"
+  );
+
+  const initialReleaseQty = extractNumber(
+    extractValue(desc, ["INITIAL RELEASE QTY"])
+  );
+
+  const initialDueDate = prefer(
+    extractValue(desc, ["INITIAL DUE DATE"]),
+    "-"
+  );
+
+  const finalDueDate = prefer(
+    extractValue(desc, ["FINAL DUE DATE"]),
+    "-"
+  );
+
+  const initialCommitmentStatus = prefer(
+    extractValue(desc, ["INITIAL COMMITMENT STATUS"]),
+    "-"
+  );
+
+  const dueDate = card.due
+    ? card.due.split("T")[0]
+    : calculateDueDate(priority);
+
+  const currentDueDate =
+    deliveryStrategy === "Partial Release"
+      ? initialCommitmentStatus === "Completed"
+        ? finalDueDate
+        : initialDueDate
+      : dueDate;
+
   const bookletItems = extractBookletItems(qtyRaw);
 
 const processingHours = calculateOrderHours(
@@ -288,8 +337,6 @@ const processingHours = calculateOrderHours(
       ]
 );
 
-  const dueDate = card.due ? card.due.split("T")[0] : calculateDueDate(priority);
-
   return {
     id: card.id,
     trackingNo,
@@ -305,8 +352,16 @@ const processingHours = calculateOrderHours(
     currentStation: stationName,
     arrivalDate: card.dateLastActivity?.split("T")[0] || "-",
     processingHours,
-    dueDate,
-    daysRemaining: workingDaysRemaining(dueDate),
+    deliveryStrategy,
+    initialReleaseQty,
+    initialDueDate,
+    finalDueDate,
+    initialCommitmentStatus,
+    currentDueDate,
+    daysRemaining:
+      currentDueDate !== "-"
+        ? workingDaysRemaining(currentDueDate)
+        : 0,
     url: card.url,
   };
 }

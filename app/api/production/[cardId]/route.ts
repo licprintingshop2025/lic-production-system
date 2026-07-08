@@ -13,17 +13,98 @@ type TrelloLabel = {
   name?: string;
 };
 
+type DeliveryStrategy = "COMPLETE" | "PARTIAL";
+
 type ProductionDetailsPayload = {
   paperType: string;
   ply: string;
   size: string;
   orderPriority: string;
   specialInstructions?: string;
+
+  deliveryStrategy: DeliveryStrategy;
+  initialReleaseQty?: string;
+  initialDueWorkingDays?: string;
+  finalDueWorkingDays?: string;
 };
 
 function value(data: unknown) {
   const text = String(data || "").trim();
   return text || "-";
+}
+
+const PRODUCTION_START_LIST = "Station 1 & 2 (Layouting & Encoding)";
+
+type TrelloAction = {
+  date: string;
+  data: {
+    listAfter?: {
+      name: string;
+    };
+  };
+};
+
+function isWeekend(date: Date) {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+function addWorkingDays(startDate: Date, workingDays: number) {
+  const date = new Date(startDate);
+  let added = 0;
+
+  while (added < workingDays) {
+    date.setDate(date.getDate() + 1);
+
+    if (!isWeekend(date)) {
+      added++;
+    }
+  }
+
+  return date;
+}
+
+function formatDateOnly(date: Date) {
+  return date.toISOString().split("T")[0];
+}
+
+async function getCardMoveActions(cardId: string, key: string, token: string) {
+  const res = await fetch(
+    `https://api.trello.com/1/cards/${cardId}/actions?filter=updateCard:idList&key=${key}&token=${token}`,
+    { cache: "no-store" }
+  );
+
+  if (!res.ok) return [];
+
+  return (await res.json()) as TrelloAction[];
+}
+
+function findFirstMoveInto(actions: TrelloAction[], listName: string) {
+  const sorted = [...actions].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
+  const action = sorted.find(
+    (item) =>
+      item.data.listAfter?.name?.trim().toUpperCase() ===
+      listName.trim().toUpperCase()
+  );
+
+  return action?.date || "";
+}
+
+function getDeliveryLabel(strategy: DeliveryStrategy) {
+  return strategy === "PARTIAL" ? "Partial Release" : "Complete Order";
+}
+
+function toPositiveNumber(value: string | undefined, fallback: number) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number) || number <= 0) {
+    return fallback;
+  }
+
+  return number;
 }
 
 async function getOrCreatePriorityLabel(
@@ -181,6 +262,41 @@ export async function PUT(req: Request, context: RouteContext) {
     const atp = isNonBir ? "-" : value(birRow[16]);
     const qty = isNonBir ? value(nonBirRow[4]) : value(birRow[12]);
     const serial = isNonBir ? value(nonBirRow[5]) : value(birRow[15]);
+    const actions = await getCardMoveActions(cardId, key, token);
+
+    const productionStartRaw = findFirstMoveInto(actions, PRODUCTION_START_LIST);
+
+    const hasProductionStarted = Boolean(productionStartRaw);
+
+    const productionStartDate = hasProductionStarted
+      ? new Date(productionStartRaw)
+      : null;
+    const deliveryStrategy =
+      body.deliveryStrategy === "PARTIAL" ? "PARTIAL" : "COMPLETE";
+
+    const initialReleaseQty = value(body.initialReleaseQty || "10");
+
+    const initialDueWorkingDays = toPositiveNumber(
+      body.initialDueWorkingDays,
+      10
+    );
+
+    const finalDueWorkingDays =
+      deliveryStrategy === "PARTIAL"
+        ? toPositiveNumber(body.finalDueWorkingDays, 30)
+        : initialDueWorkingDays;
+
+    const initialDueDate =
+      productionStartDate && deliveryStrategy === "PARTIAL"
+        ? addWorkingDays(productionStartDate, initialDueWorkingDays)
+        : null;
+
+    const finalDueDate = productionStartDate
+      ? addWorkingDays(productionStartDate, finalDueWorkingDays)
+      : null;
+
+    const trelloDueDate =
+      deliveryStrategy === "PARTIAL" ? initialDueDate : finalDueDate;
 
     const compactDescription = `
 TRACKING: ${trackingNo}
@@ -200,6 +316,21 @@ SERIAL: ${serial}
 
 PRIORITY: ${body.orderPriority}
 
+DELIVERY COMMITMENT:
+DELIVERY STRATEGY: ${getDeliveryLabel(deliveryStrategy)}
+INITIAL RELEASE QTY: ${deliveryStrategy === "PARTIAL" ? `${initialReleaseQty} Booklets` : "-"
+      }
+INITIAL DUE WD: ${deliveryStrategy === "PARTIAL" ? initialDueWorkingDays : "-"
+      }
+FINAL DUE WD: ${finalDueWorkingDays}
+PRODUCTION START: ${
+      productionStartDate ? formatDateOnly(productionStartDate) : "Not Started"
+      }
+INITIAL DUE DATE: ${initialDueDate ? formatDateOnly(initialDueDate) : "Pending Station 1 & 2"
+      }
+FINAL DUE DATE: ${finalDueDate ? formatDateOnly(finalDueDate) : "Pending Station 1 & 2"
+}
+
 PRODUCTION:
 PAPER: ${body.paperType}
 PLY: ${body.ply}
@@ -216,6 +347,7 @@ STATUS: Production Details Complete
         body: JSON.stringify({
           desc: compactDescription,
           idList: station4ListId,
+          ...(trelloDueDate ? { due: trelloDueDate.toISOString() } : {}),
         }),
       }
     );
