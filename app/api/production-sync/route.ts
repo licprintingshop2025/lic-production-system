@@ -1,7 +1,19 @@
 import { NextResponse } from "next/server";
 import { runProductionSync } from "@/lib/productionSyncEngine";
 
+let isRunning = false;
+
 export async function GET() {
+  if (isRunning) {
+    return NextResponse.json({
+      success: true,
+      skipped: true,
+      reason: "Production sync already running",
+    });
+  }
+
+  isRunning = true;
+
   try {
     const result = await runProductionSync();
     return NextResponse.json(result);
@@ -13,5 +25,7 @@ export async function GET() {
       },
       { status: 500 }
     );
+  } finally {
+    isRunning = false;
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { calculateOrderHours } from "@/lib/production/calculator";
 import {
   findBIRProductionRecordByCardId,
   findReceivedATPByCardId,
@@ -78,29 +79,20 @@ function extractTotalBooklets(value: string) {
   }, 0);
 }
 
+function extractBookletItems(value: string) {
+  const numbers = value.match(/\d+/g);
+
+  if (!numbers) return [];
+
+  return numbers.map((number) => Number(number));
+}
+
 function hasLabel(card: TrelloCard, labelName: string) {
   return (
     card.labels?.some(
       (label) => label.name?.toLowerCase() === labelName.toLowerCase()
     ) || false
   );
-}
-
-function calculateProcessingHours({
-  booklets,
-  paperType,
-  ply,
-}: {
-  booklets: number;
-  paperType: string;
-  ply: string;
-}) {
-  let base = Math.max(booklets, 1) * 0.35;
-
-  if (paperType.toLowerCase().includes("carbon")) base *= 1.25;
-  if (ply.includes("3")) base *= 1.2;
-
-  return Number(base.toFixed(3));
 }
 
 function addWorkingDays(startDate: Date, workingDays: number) {
@@ -270,11 +262,31 @@ async function buildTrackerRow(card: TrelloCard, stationName: string) {
         "Normal"
       );
 
-  const processingHours = calculateProcessingHours({
-    booklets,
-    paperType,
-    ply,
-  });
+  const specialInstruction = extractValue(desc, ["SPECIAL INSTRUCTION", "SPECIAL INSTRUCTIONS", "SPECIAL"]) || "";
+
+  const bookletItems = extractBookletItems(qtyRaw);
+
+const processingHours = calculateOrderHours(
+  bookletItems.length > 0
+    ? bookletItems.map((qty) => ({
+        booklets: qty,
+        paperType,
+        ply,
+        size,
+        priority,
+        specialInstruction,
+      }))
+    : [
+        {
+          booklets,
+          paperType,
+          ply,
+          size,
+          priority,
+          specialInstruction,
+        },
+      ]
+);
 
   const dueDate = card.due ? card.due.split("T")[0] : calculateDueDate(priority);
 

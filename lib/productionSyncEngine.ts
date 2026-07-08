@@ -330,8 +330,14 @@ export async function runProductionSync() {
               productionTime,
             ];
 
-            await appendBIRProductionRecord(productionRecordRow);
-            archived++;
+            const birStillNotArchived = !(await findBIRProductionRecordByCardId(card.id));
+
+            if (birStillNotArchived) {
+              await appendBIRProductionRecord(productionRecordRow);
+              archived++;
+            } else {
+              skipped++;
+            }
           } else if (nonBIROrder) {
             const nonBirRow = nonBIROrder.row;
 
@@ -350,8 +356,16 @@ export async function runProductionSync() {
               productionTime,
             ];
 
-            await appendNonBIRProductionRecord(productionRecordRow);
-            archived++;
+            const nonBirStillNotArchived = !(
+              await findNonBIRProductionRecordByCardId(card.id)
+            );
+
+            if (nonBirStillNotArchived) {
+              await appendNonBIRProductionRecord(productionRecordRow);
+              archived++;
+            } else {
+              skipped++;
+            }
           } else {
             skipped++;
             errors.push(`No source record found for card: ${card.name}`);
