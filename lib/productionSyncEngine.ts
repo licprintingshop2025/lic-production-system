@@ -317,7 +317,15 @@ async function setDueDateIfProductionStarted({
   key: string;
   token: string;
 }) {
-  if (!isInList(currentList, [PRODUCTION_START_LIST])) return false;
+  if (
+    isInList(currentList, ARCHIVE_LISTS) ||
+    currentList.toUpperCase().includes("INTAKE") ||
+    currentList.toUpperCase().includes("STATION 4") ||
+    currentList.toUpperCase().includes("TEXT MESSAGING") ||
+    currentList.toUpperCase().includes("STATION 3")
+  ) {
+    return false;
+  }
 
   const actions = await getCardMoveActions(card.id, key, token);
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import AppShell from "../components/AppShell";
 import PageHeader from "../components/PageHeader";
+import ProductionSyncRunner from "../components/ProductionSyncRunner";
 import {
   generateSmartAssignments,
   type Assignment,
@@ -255,6 +256,7 @@ export default function DailyOperationsPage() {
 
   return (
     <AppShell activePage="daily-operations">
+      <ProductionSyncRunner />
       <div className="mx-auto max-w-[1500px]">
         <PageHeader
           title="Daily Operations"
