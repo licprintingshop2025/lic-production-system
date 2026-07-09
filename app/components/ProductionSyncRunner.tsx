@@ -11,11 +11,11 @@ export default function ProductionSyncRunner() {
 
     async function runSyncAndRefresh() {
       try {
-        await fetch("/api/production-sync", {
+        const res = await fetch("/api/production-sync", {
           cache: "no-store",
         });
 
-        if (isMounted) {
+        if (res.ok && isMounted) {
           router.refresh();
         }
       } catch (error) {
@@ -23,7 +23,7 @@ export default function ProductionSyncRunner() {
       }
     }
 
-    const interval = setInterval(runSyncAndRefresh, 10000);
+    const interval = setInterval(runSyncAndRefresh, 30000);
 
     return () => {
       isMounted = false;

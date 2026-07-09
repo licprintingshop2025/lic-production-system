@@ -360,6 +360,11 @@ async function setDueDateIfProductionStarted({
     ? existingProductionStart
     : station1StartedRaw;
 
+  const priority = getPriorityFromLabels(card);
+
+  const completeOrderWorkingDays =
+    priority === "rush" ? 3 : finalWorkingDays;
+
   const initialDueDate = calculateDueDateFromStart(
     productionStartForDue,
     initialWorkingDays
@@ -367,7 +372,7 @@ async function setDueDateIfProductionStarted({
 
   const finalDueDate = calculateDueDateFromStart(
     productionStartForDue,
-    finalWorkingDays
+    deliveryStrategyIsPartial ? finalWorkingDays : completeOrderWorkingDays
   );
 
   const initialCommitmentCompleted = deliveryStrategyIsPartial
