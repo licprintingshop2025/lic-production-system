@@ -44,7 +44,14 @@ export default function CompleteProductionDetailsPage() {
       const res = await fetch(`/api/production/${cardId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          finalDueWorkingDays:
+            formData.deliveryStrategy === "COMPLETE" &&
+              formData.orderPriority === "Rush"
+              ? "3"
+              : formData.finalDueWorkingDays,
+        }),
       });
 
       const result = await res.json();
