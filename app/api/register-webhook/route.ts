@@ -17,7 +17,7 @@ export async function GET() {
     const callbackURL = `${appUrl}/api/trello/webhook`;
 
     const res = await fetch(
-      `https://api.trello.com/1/webhooks/?key=${key}&token=${token}`,
+      `https://api.trello.com/1/webhooks?key=${key}&token=${token}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -33,21 +33,20 @@ export async function GET() {
 
     if (!res.ok) {
       return NextResponse.json(
-        { error: "Failed to register webhook", details: data },
+        { error: "Failed to register webhook.", details: data },
         { status: res.status }
       );
     }
 
     return NextResponse.json({
       success: true,
-      callbackURL,
       webhook: data,
     });
   } catch (error) {
     return NextResponse.json(
       {
-        error: "Webhook registration failed",
-        details: error instanceof Error ? error.message : "Unknown error",
+        error:
+          error instanceof Error ? error.message : "Webhook registration failed.",
       },
       { status: 500 }
     );
