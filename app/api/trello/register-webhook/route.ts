@@ -16,26 +16,40 @@ export async function GET() {
 
     const callbackURL = `${appUrl}/api/trello/webhook`;
 
+    const params = new URLSearchParams({
+      key,
+      token,
+      idModel: boardId,
+      callbackURL,
+      description: "LIC Production System Webhook",
+    });
+
     const res = await fetch(
-      `https://api.trello.com/1/webhooks?key=${key}&token=${token}`,
+      `https://api.trello.com/1/webhooks?${params.toString()}`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          description: "LIC Production System Webhook",
-          callbackURL,
-          idModel: boardId,
-        }),
       }
     );
 
-    const data = await res.json();
+    const text = await res.text();
 
     if (!res.ok) {
       return NextResponse.json(
-        { error: "Failed to register webhook.", details: data },
+        {
+          success: false,
+          status: res.status,
+          trelloResponse: text,
+        },
         { status: res.status }
       );
+    }
+
+    let data;
+
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
     }
 
     return NextResponse.json({
@@ -46,7 +60,9 @@ export async function GET() {
     return NextResponse.json(
       {
         error:
-          error instanceof Error ? error.message : "Webhook registration failed.",
+          error instanceof Error
+            ? error.message
+            : "Webhook registration failed.",
       },
       { status: 500 }
     );
