@@ -281,10 +281,15 @@ export async function PUT(req: Request, context: RouteContext) {
       10
     );
 
+    const isRush =
+      body.orderPriority?.trim().toLowerCase() === "rush";
+
     const finalDueWorkingDays =
       deliveryStrategy === "PARTIAL"
         ? toPositiveNumber(body.finalDueWorkingDays, 30)
-        : initialDueWorkingDays;
+        : isRush
+          ? 3
+          : 10;
 
     const initialDueDate =
       productionStartDate && deliveryStrategy === "PARTIAL"
