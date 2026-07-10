@@ -95,9 +95,11 @@ async function resetChecklist(cardId: string) {
   )) as Checklist[];
 
   for (const checklist of checklists) {
-    await trelloFetch(`checklists/${checklist.id}`, {
-      method: "DELETE",
-    });
+    if (normalize(checklist.name) === "STATUS") {
+      await trelloFetch(`checklists/${checklist.id}`, {
+        method: "DELETE",
+      });
+    }
   }
 
   const newChecklist = await trelloFetch(`cards/${cardId}/checklists`, {
