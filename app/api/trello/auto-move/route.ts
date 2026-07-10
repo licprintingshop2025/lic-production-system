@@ -146,11 +146,17 @@ async function cardChecklistDone(cardId: string) {
     `cards/${cardId}/checklists`
   )) as Checklist[];
 
-  const allItems = checklists.flatMap((checklist) => checklist.checkItems);
+  const statusChecklist = checklists.find(
+    (checklist) => normalize(checklist.name) === "STATUS"
+  );
 
-  if (!allItems.length) return false;
+  if (!statusChecklist?.checkItems?.length) return false;
 
-  return allItems.every((item) => item.state === "complete");
+  return statusChecklist.checkItems.some(
+    (item) =>
+      item.name.toLowerCase() === "done" &&
+      item.state === "complete"
+  );
 }
 
 export async function POST() {

@@ -93,7 +93,7 @@ export default function DailyOperationsPage() {
 
     const interval = setInterval(() => {
       loadDailyData();
-    }, 5000);
+    }, 30000);
 
     return () => clearInterval(interval);
   }, []);

@@ -33,7 +33,13 @@ function prefer(...values: (string | undefined | null)[]) {
 
 function extractValue(desc: string, labels: string[]) {
   for (const label of labels) {
-    const regex = new RegExp(`${label}:\\s*\\n?([^\\n]+)`, "gi");
+    const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    const regex = new RegExp(
+      `^${escapedLabel}:\\s*([^\\n]+)`,
+      "gim"
+    );
+
     const matches = [...desc.matchAll(regex)];
 
     if (matches.length > 0) {
@@ -45,7 +51,10 @@ function extractValue(desc: string, labels: string[]) {
 }
 
 function extractTotalBooklets(value: string) {
+  if (!value || value === "-") return 0;
+
   const numbers = value.match(/\d+/g);
+
   if (!numbers) return 0;
 
   return numbers.reduce((total, number) => total + Number(number), 0);

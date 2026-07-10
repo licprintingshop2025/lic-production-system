@@ -15,23 +15,43 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-
     const actionType = body.action?.type;
 
-    if (actionType !== "updateCard") {
+    const allowedActions = [
+      "updateCard",
+      "updateCheckItemStateOnCard",
+      "addChecklistToCard",
+      "createCheckItem",
+    ];
+
+    if (!allowedActions.includes(actionType)) {
       return NextResponse.json({
         success: true,
         skipped: true,
-        reason: "Not a card update.",
+        reason: `Ignored action: ${actionType}`,
       });
     }
 
-    const result = await runProductionSync();
+    const syncResult = await runProductionSync();
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+    let autoMoveResult = null;
+
+    if (appUrl) {
+      const autoMoveRes = await fetch(`${appUrl}/api/trello/auto-move`, {
+        method: "POST",
+      });
+
+      autoMoveResult = await autoMoveRes.json();
+    }
 
     return NextResponse.json({
       success: true,
       trigger: "trello-webhook",
-      result,
+      actionType,
+      syncResult,
+      autoMoveResult,
     });
   } catch (error) {
     return NextResponse.json(
