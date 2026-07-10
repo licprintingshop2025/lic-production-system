@@ -7,28 +7,11 @@ export default function ProductionSyncRunner() {
   const router = useRouter();
 
   useEffect(() => {
-    let isMounted = true;
+    const interval = setInterval(() => {
+      router.refresh();
+    }, 30000);
 
-    async function runSyncAndRefresh() {
-      try {
-        const res = await fetch("/api/production-sync", {
-          cache: "no-store",
-        });
-
-        if (res.ok && isMounted) {
-          router.refresh();
-        }
-      } catch (error) {
-        console.error("Production auto-refresh failed:", error);
-      }
-    }
-
-    const interval = setInterval(runSyncAndRefresh, 30000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, [router]);
 
   return null;

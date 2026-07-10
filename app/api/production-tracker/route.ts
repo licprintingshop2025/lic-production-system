@@ -1,10 +1,5 @@
 import { NextResponse } from "next/server";
 import { calculateOrderHours } from "@/lib/production/calculator";
-import {
-  findBIRProductionRecordByCardId,
-  findReceivedATPByCardId,
-  findNonBIROrderByCardId,
-} from "@/lib/googleSheets";
 
 type TrelloLabel = {
   name?: string;
@@ -23,34 +18,6 @@ type TrelloCard = {
 type TrelloList = {
   name: string;
   cards: TrelloCard[];
-};
-
-type TrackerRow = {
-  id: string;
-
-  trackingNo: string;
-  atpId: string;
-  businessName: string;
-
-  orderQuantity: number;
-  serial: string;
-  receiptType: string;
-
-  paperType: string;
-  ply: string;
-  size: string;
-  orderPriority: string;
-  currentStation: string;
-  arrivalDate: string;
-  processingHours: number;
-  deliveryStrategy: string;
-  initialReleaseQty: number;
-  initialDueDate: string;
-  finalDueDate: string;
-  currentDueDate: string;
-  daysRemaining: number;
-  initialCommitmentStatus: string;
-  url: string;
 };
 
 function clean(value?: string | null) {
@@ -79,17 +46,13 @@ function extractValue(desc: string, labels: string[]) {
 
 function extractTotalBooklets(value: string) {
   const numbers = value.match(/\d+/g);
-
   if (!numbers) return 0;
 
-  return numbers.reduce((total, number) => {
-    return total + Number(number);
-  }, 0);
+  return numbers.reduce((total, number) => total + Number(number), 0);
 }
 
 function extractBookletItems(value: string) {
   const numbers = value.match(/\d+/g);
-
   if (!numbers) return [];
 
   return numbers.map((number) => Number(number));
@@ -97,7 +60,6 @@ function extractBookletItems(value: string) {
 
 function extractNumber(value: string) {
   const match = value.match(/\d+/);
-
   return match ? Number(match[0]) : 0;
 }
 
@@ -138,12 +100,15 @@ function workingDaysRemaining(dueDate: string) {
   today.setHours(0, 0, 0, 0);
   due.setHours(0, 0, 0, 0);
 
+  if (Number.isNaN(due.getTime())) return 0;
+
   if (due < today) {
     let overdue = 0;
     const cursor = new Date(due);
 
     while (cursor < today) {
       cursor.setDate(cursor.getDate() + 1);
+
       const day = cursor.getDay();
 
       if (day !== 0 && day !== 6) {
@@ -159,6 +124,7 @@ function workingDaysRemaining(dueDate: string) {
 
   while (cursor < due) {
     cursor.setDate(cursor.getDate() + 1);
+
     const day = cursor.getDay();
 
     if (day !== 0 && day !== 6) {
@@ -186,97 +152,52 @@ const PRODUCTION_START_STATIONS = [
   "READY FOR RELEASE",
 ];
 
-async function buildTrackerRow(card: TrelloCard, stationName: string) {
+function buildTrackerRow(card: TrelloCard, stationName: string) {
   const desc = card.desc || "";
 
-  const productionRecord = await findBIRProductionRecordByCardId(card.id);
-  const receivedATP = await findReceivedATPByCardId(card.id);
-  const nonBirOrder = await findNonBIROrderByCardId(card.id);
+  const trackingNo = extractValue(desc, [
+    "TRACKING",
+    "TRACKING NO",
+    "TRACKING NUMBER",
+  ]);
 
-  const isNonBir =
-    !!nonBirOrder ||
-    card.name.toUpperCase().includes("NON-BIR") ||
-    card.name.toUpperCase().includes("NON BIR");
+  const atpId = prefer(extractValue(desc, ["OCN", "ATP ID"]));
 
-  const birRow = productionRecord?.row || receivedATP?.row || [];
-  const nonBirRow = nonBirOrder?.row || [];
-
-  const trackingNo = isNonBir
-    ? prefer(
-        nonBirRow[0],
-        extractValue(desc, ["TRACKING", "TRACKING NO", "TRACKING NUMBER"])
-      )
-    : prefer(
-        birRow[1],
-        birRow[0],
-        extractValue(desc, ["TRACKING", "TRACKING NO", "TRACKING NUMBER"])
-      );
-
-  const atpId = isNonBir
-    ? "-"
-    : prefer(birRow[3], birRow[2], extractValue(desc, ["OCN", "ATP ID"]));
-
-  const businessName = isNonBir
-    ? prefer(
-        nonBirRow[2],
-        extractValue(desc, ["BUSINESS", "BUSINESS NAME", "TRADE NAME"])
-      )
-    : prefer(
-        birRow[6],
-        birRow[5],
-        extractValue(desc, [
-          "TRADE NAME",
-          "BUSINESS / TRADE NAME",
-          "BUSINESS NAME",
-        ])
-      );
-
-  const qtyRaw = isNonBir
-  ? prefer(
-      nonBirRow[4],
-      extractValue(desc, ["QTY", "QUANTITY", "NO. OF BOOKLETS"])
-    )
-  : prefer(
-      birRow[12], // No. of Booklets
-      extractValue(desc, ["QTY", "QUANTITY", "NO. OF BOOKLETS"])
-    );
-
-  const booklets = extractTotalBooklets(qtyRaw);
-
-  const serial = isNonBir
-  ? prefer(nonBirRow[5], extractValue(desc, ["SERIAL", "SERIAL NUMBERS"]))
-  : prefer(
-      birRow[15], // Serial Numbers
-      extractValue(desc, ["SERIAL", "SERIAL NUMBERS"])
-    );
-
-  const receiptType = isNonBir
-  ? prefer(nonBirRow[3], extractValue(desc, ["DOCUMENT", "DESCRIPTION"]))
-  : prefer(
-      birRow[10], // Description / Kind of Invoice or Receipt
-      extractValue(desc, ["DOCUMENT", "RECEIPT TYPE", "TYPE OF RECEIPT"])
-    );
-
-  const paperType = prefer(
-    extractValue(desc, ["PAPER", "PAPER TYPE"]),
-    birRow[19]
+  const businessName = prefer(
+    extractValue(desc, ["TRADE NAME"]),
+    extractValue(desc, ["BUSINESS", "BUSINESS NAME"])
   );
 
-  const ply = prefer(extractValue(desc, ["PLY"]), birRow[20]);
+  const qtyRaw = extractValue(desc, ["QTY", "QUANTITY", "NO. OF BOOKLETS"]);
+  const booklets = extractTotalBooklets(qtyRaw);
 
-  const size = prefer(extractValue(desc, ["SIZE", "PAPER SIZE"]), birRow[21]);
+  const serial = extractValue(desc, ["SERIAL", "SERIAL NUMBERS"]);
+
+  const receiptType = extractValue(desc, [
+    "DOCUMENT",
+    "DESCRIPTION",
+    "RECEIPT TYPE",
+    "TYPE OF RECEIPT",
+  ]);
+
+  const paperType = extractValue(desc, ["PAPER", "PAPER TYPE"]);
+
+  const ply = extractValue(desc, ["PLY"]);
+
+  const size = extractValue(desc, ["SIZE", "PAPER SIZE"]);
 
   const priority = hasLabel(card, "Rush")
     ? "Rush"
     : hasLabel(card, "Normal")
     ? "Normal"
-    : prefer(
-        extractValue(desc, ["PRIORITY", "ORDER PRIORITY"]),
-        birRow[22],
-        "Normal"
-      );
+    : prefer(extractValue(desc, ["PRIORITY", "ORDER PRIORITY"]), "Normal");
 
-  const specialInstruction = extractValue(desc, ["SPECIAL INSTRUCTION", "SPECIAL INSTRUCTIONS", "SPECIAL"]) || "";
+  const specialInstruction =
+    extractValue(desc, [
+      "SPECIAL INSTRUCTION",
+      "SPECIAL INSTRUCTIONS",
+      "SPECIAL",
+    ]) || "";
 
   const deliveryStrategy = prefer(
     extractValue(desc, ["DELIVERY STRATEGY"]),
@@ -287,24 +208,16 @@ async function buildTrackerRow(card: TrelloCard, stationName: string) {
     extractValue(desc, ["INITIAL RELEASE QTY"])
   );
 
-  const initialDueDate = prefer(
-    extractValue(desc, ["INITIAL DUE DATE"]),
-    "-"
-  );
+  const initialDueDate = prefer(extractValue(desc, ["INITIAL DUE DATE"]), "-");
 
-  const finalDueDate = prefer(
-    extractValue(desc, ["FINAL DUE DATE"]),
-    "-"
-  );
+  const finalDueDate = prefer(extractValue(desc, ["FINAL DUE DATE"]), "-");
 
   const initialCommitmentStatus = prefer(
     extractValue(desc, ["INITIAL COMMITMENT STATUS"]),
     "-"
   );
 
-  const dueDate = card.due
-    ? card.due.split("T")[0]
-    : calculateDueDate(priority);
+  const dueDate = card.due ? card.due.split("T")[0] : calculateDueDate(priority);
 
   const currentDueDate =
     deliveryStrategy === "Partial Release"
@@ -315,27 +228,27 @@ async function buildTrackerRow(card: TrelloCard, stationName: string) {
 
   const bookletItems = extractBookletItems(qtyRaw);
 
-const processingHours = calculateOrderHours(
-  bookletItems.length > 0
-    ? bookletItems.map((qty) => ({
-        booklets: qty,
-        paperType,
-        ply,
-        size,
-        priority,
-        specialInstruction,
-      }))
-    : [
-        {
-          booklets,
+  const processingHours = calculateOrderHours(
+    bookletItems.length > 0
+      ? bookletItems.map((qty) => ({
+          booklets: qty,
           paperType,
           ply,
           size,
           priority,
           specialInstruction,
-        },
-      ]
-);
+        }))
+      : [
+          {
+            booklets,
+            paperType,
+            ply,
+            size,
+            priority,
+            specialInstruction,
+          },
+        ]
+  );
 
   return {
     id: card.id,
@@ -358,10 +271,8 @@ const processingHours = calculateOrderHours(
     finalDueDate,
     initialCommitmentStatus,
     currentDueDate,
-    daysRemaining:
-      currentDueDate !== "-"
-        ? workingDaysRemaining(currentDueDate)
-        : 0,
+    dueDate: currentDueDate,
+    daysRemaining: currentDueDate !== "-" ? workingDaysRemaining(currentDueDate) : 0,
     url: card.url,
   };
 }
@@ -392,24 +303,15 @@ export async function GET() {
 
   const lists = (await res.json()) as TrelloList[];
 
-  const cardsInProduction = lists
+  const rows = lists
     .filter((list) =>
       PRODUCTION_START_STATIONS.some((station) =>
         list.name.toUpperCase().includes(station)
       )
     )
     .flatMap((list) =>
-      list.cards.map((card) => ({
-        card,
-        stationName: list.name,
-      }))
+      list.cards.map((card) => buildTrackerRow(card, list.name))
     );
-
-  const rows = await Promise.all(
-    cardsInProduction.map(({ card, stationName }) =>
-      buildTrackerRow(card, stationName)
-    )
-  );
 
   rows.sort((a, b) => {
     if (a.orderPriority === "Rush" && b.orderPriority !== "Rush") return -1;
