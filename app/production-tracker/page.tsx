@@ -106,7 +106,7 @@ export default async function ProductionTrackerPage() {
   return (
     <AppShell activePage="production-tracker">
       <ProductionSyncRunner />
-      <div className="mx-auto max-w-[1500px]">
+      <div className="mx-auto w-full max-w-[1800px]">
         <PageHeader
           title="Production Tracker"
           description="Monitor every production job with tracking number, business details, priority, current station, due date, and remaining processing time."
@@ -151,12 +151,11 @@ export default async function ProductionTrackerPage() {
             </span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1450px] text-left text-sm">
-              <thead className="bg-[#fbf7ef] text-[#5f5448]">
+          <div className="max-h-[calc(100vh-360px)] overflow-auto">
+            <table className="w-full min-w-[1280px] text-left text-sm">
+              <thead className="sticky top-0 z-20 bg-[#fbf7ef] text-[#5f5448]">
                 <tr>
                   <th className="p-4">Tracking No.</th>
-                  <th className="p-4">ATP / OCN</th>
                   <th className="p-4">Business Name</th>
                   <th className="p-4 text-center">Qty</th>
                   <th className="p-4">Serial</th>
@@ -177,7 +176,7 @@ export default async function ProductionTrackerPage() {
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={16} className="p-8 text-center text-[#6f6254]">
+                    <td colSpan={15} className="p-8 text-center text-[#6f6254]">
                       No production records found.
                     </td>
                   </tr>
@@ -201,11 +200,7 @@ export default async function ProductionTrackerPage() {
                           </a>
                         </td>
 
-                        <td className="p-4 text-[#6f6254]">
-                          {row.atpId || "-"}
-                        </td>
-
-                        <td className="max-w-[260px] p-4 font-bold text-black">
+                        <td className="max-w-[220px] p-4 font-bold text-black">
                           <span className="line-clamp-2">
                             {row.businessName || "-"}
                           </span>
@@ -215,11 +210,12 @@ export default async function ProductionTrackerPage() {
                           {row.orderQuantity || "-"}
                         </td>
 
-                        <td className="p-4 text-[#6f6254]">
+                        <td className="max-w-[150px] p-4 text-[#6f6254] break-words">
                           {row.serial || "-"}
                         </td>
 
-                        <td className="p-4 text-[#6f6254]">
+                        <td className="max-w-[120px] p-4 text-[#6f6254]">
+                          <span className="line-clamp-2"></span>
                           {row.receiptType || "-"}
                         </td>
 
