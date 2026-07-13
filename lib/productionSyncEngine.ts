@@ -38,6 +38,31 @@ type TrelloAction = {
   };
 };
 
+type TrelloCheckItem = {
+  id: string;
+  name: string;
+  state: "complete" | "incomplete";
+};
+
+type TrelloChecklist = {
+  id: string;
+  name: string;
+  checkItems?: TrelloCheckItem[];
+};
+
+type ProductionSyncResult = {
+  success: boolean;
+  cardsChecked: number;
+  checklistsCreated: number;
+  dueDatesCreated: number;
+  archived: number;
+  trelloCardsArchived: number;
+  skipped: number;
+  errors: string[];
+  changed: boolean;
+  lastUpdated: string | null;
+};
+
 const CHECKLIST_REQUIRED_LISTS = ["Finish Receipt", "Ready for Release"];
 
 const ARCHIVE_LISTS = ["Delivered by LIC", "Picked Up by Client"];
@@ -47,31 +72,82 @@ const COMPLETED_LIST = "Finish Receipt";
 
 const AUTO_ARCHIVE_AFTER_DAYS = 7;
 
-function normalize(value: string) {
+function findChecklistsByName(
+  checklists: TrelloChecklist[],
+  name: string,
+): TrelloChecklist[] {
+  const normalizedName = normalize(name);
+
+  return checklists.filter(
+    (checklist) => normalize(checklist.name) === normalizedName,
+  );
+}
+
+function hasCompletedCheckItem(
+  checklist: TrelloChecklist,
+  itemName: string,
+): boolean {
+  const normalizedItemName = normalize(itemName);
+
+  return (
+    checklist.checkItems?.some(
+      (item) =>
+        normalize(item.name) === normalizedItemName &&
+        item.state === "complete",
+    ) ?? false
+  );
+}
+
+function chooseChecklistToKeep(
+  checklists: TrelloChecklist[],
+  completedItemName: string,
+  preferredChecklistId?: string,
+): TrelloChecklist {
+  const completedChecklist = checklists.find((checklist) =>
+    hasCompletedCheckItem(checklist, completedItemName),
+  );
+
+  if (completedChecklist) {
+    return completedChecklist;
+  }
+
+  if (preferredChecklistId) {
+    const preferredChecklist = checklists.find(
+      (checklist) => checklist.id === preferredChecklistId,
+    );
+
+    if (preferredChecklist) {
+      return preferredChecklist;
+    }
+  }
+
+  return checklists[0];
+}
+
+function normalize(value: string): string {
   return value.trim().toUpperCase();
 }
 
-function isInList(listName: string, targetLists: string[]) {
-  return targetLists.some((target) => normalize(target) === normalize(listName));
+function isInList(listName: string, targetLists: string[]): boolean {
+  return targetLists.some(
+    (target) => normalize(target) === normalize(listName),
+  );
 }
 
 function getPriorityFromLabels(card: TrelloCard) {
   const hasRush = card.labels?.some(
-    (label) => label.name?.toLowerCase() === "rush"
+    (label) => label.name?.toLowerCase() === "rush",
   );
 
   return hasRush ? "rush" : "normal";
 }
 
-function isWeekend(date: Date) {
+function isWeekend(date: Date): boolean {
   const day = date.getDay();
   return day === 0 || day === 6;
 }
 
-function calculateDueDateFromStart(
-  startDate: string,
-  workingDays: number
-) {
+function calculateDueDateFromStart(startDate: string, workingDays: number) {
   const date = new Date(startDate);
 
   let addedWorkingDays = 0;
@@ -87,28 +163,7 @@ function calculateDueDateFromStart(
   return date.toISOString();
 }
 
-function extractDeliveryDueWorkingDays(desc: string) {
-  const isPartial =
-    /DELIVERY STRATEGY:\s*Partial Release/i.test(desc);
-
-  const initialMatch =
-    desc.match(/INITIAL DUE WD:\s*(\d+)/i);
-
-  const finalMatch =
-    desc.match(/FINAL DUE WD:\s*(\d+)/i);
-
-  if (isPartial && initialMatch) {
-    return Number(initialMatch[1]);
-  }
-
-  if (finalMatch) {
-    return Number(finalMatch[1]);
-  }
-
-  return 10;
-}
-
-function formatDateOnly(dateString: string) {
+function formatDateOnly(dateString: string): string {
   return new Date(dateString).toISOString().split("T")[0];
 }
 
@@ -149,7 +204,7 @@ async function archiveTrelloCard(cardId: string, key: string, token: string) {
       body: JSON.stringify({
         closed: true,
       }),
-    }
+    },
   );
 
   return res.ok;
@@ -158,7 +213,7 @@ async function archiveTrelloCard(cardId: string, key: string, token: string) {
 async function getCardMoveActions(cardId: string, key: string, token: string) {
   const res = await fetch(
     `https://api.trello.com/1/cards/${cardId}/actions?filter=updateCard:idList&key=${key}&token=${token}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
 
   if (!res.ok) return [];
@@ -168,65 +223,153 @@ async function getCardMoveActions(cardId: string, key: string, token: string) {
 
 function findFirstMoveInto(actions: TrelloAction[], listName: string) {
   const sorted = [...actions].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
   );
 
   const action = sorted.find(
     (item) =>
       item.data.listAfter?.name?.trim().toUpperCase() ===
-      listName.trim().toUpperCase()
+      listName.trim().toUpperCase(),
   );
 
   return action?.date || "";
 }
 
-async function getCardChecklists(cardId: string, key: string, token: string) {
+async function getCardChecklists(
+  cardId: string,
+  key: string,
+  token: string,
+): Promise<TrelloChecklist[]> {
   const res = await fetch(
     `https://api.trello.com/1/cards/${cardId}/checklists?key=${key}&token=${token}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
 
-  if (!res.ok) return [];
+  if (!res.ok) {
+    throw new Error(`Failed to load checklists for Trello card ${cardId}`);
+  }
 
-  return res.json();
+  return (await res.json()) as TrelloChecklist[];
 }
 
-async function ensureStatusChecklist(cardId: string, key: string, token: string) {
-  const checklists = await getCardChecklists(cardId, key, token);
-
-  const hasStatusChecklist = checklists.some(
-    (checklist: { name: string }) => checklist.name.toUpperCase() === "STATUS"
+async function deleteChecklist(
+  checklistId: string,
+  key: string,
+  token: string,
+): Promise<void> {
+  const res = await fetch(
+    `https://api.trello.com/1/checklists/${checklistId}?key=${key}&token=${token}`,
+    {
+      method: "DELETE",
+    },
   );
 
-  if (hasStatusChecklist) return false;
+  if (!res.ok) {
+    throw new Error(
+      `Failed to delete duplicate Trello checklist ${checklistId}`,
+    );
+  }
+}
+
+async function deleteDuplicateChecklists(
+  checklists: TrelloChecklist[],
+  checklistToKeep: TrelloChecklist,
+  key: string,
+  token: string,
+): Promise<void> {
+  const duplicates = checklists.filter(
+    (checklist) => checklist.id !== checklistToKeep.id,
+  );
+
+  for (const duplicate of duplicates) {
+    await deleteChecklist(duplicate.id, key, token);
+  }
+}
+
+async function ensureStatusChecklist(
+  cardId: string,
+  key: string,
+  token: string,
+): Promise<boolean> {
+  const existingChecklists = await getCardChecklists(cardId, key, token);
+
+  const matchingChecklists = findChecklistsByName(existingChecklists, "Status");
+
+  if (matchingChecklists.length > 1) {
+    const checklistToKeep = chooseChecklistToKeep(matchingChecklists, "Done");
+
+    await deleteDuplicateChecklists(
+      matchingChecklists,
+      checklistToKeep,
+      key,
+      token,
+    );
+
+    return false;
+  }
+
+  if (matchingChecklists.length === 1) {
+    return false;
+  }
 
   const createChecklistRes = await fetch(
     `https://api.trello.com/1/checklists?key=${key}&token=${token}`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         idCard: cardId,
         name: "Status",
       }),
-    }
+    },
   );
 
-  if (!createChecklistRes.ok) return false;
+  if (!createChecklistRes.ok) {
+    throw new Error(`Failed to create Status checklist for card ${cardId}`);
+  }
 
-  const checklist = await createChecklistRes.json();
+  const createdChecklist = (await createChecklistRes.json()) as TrelloChecklist;
 
-  await fetch(
-    `https://api.trello.com/1/checklists/${checklist.id}/checkItems?key=${key}&token=${token}`,
+  const createItemRes = await fetch(
+    `https://api.trello.com/1/checklists/${createdChecklist.id}/checkItems?key=${key}&token=${token}`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         name: "Done",
         checked: false,
       }),
-    }
+    },
   );
+
+  if (!createItemRes.ok) {
+    throw new Error(
+      `Status checklist was created, but the Done item could not be created for card ${cardId}`,
+    );
+  }
+
+  const verifiedChecklists = await getCardChecklists(cardId, key, token);
+
+  const verifiedMatches = findChecklistsByName(verifiedChecklists, "Status");
+
+  if (verifiedMatches.length > 1) {
+    const checklistToKeep = chooseChecklistToKeep(
+      verifiedMatches,
+      "Done",
+      createdChecklist.id,
+    );
+
+    await deleteDuplicateChecklists(
+      verifiedMatches,
+      checklistToKeep,
+      key,
+      token,
+    );
+  }
 
   return true;
 }
@@ -234,49 +377,104 @@ async function ensureStatusChecklist(cardId: string, key: string, token: string)
 async function ensureInitialCommitmentChecklist(
   card: TrelloCard,
   key: string,
-  token: string
-) {
-  const isPartial =
-    /DELIVERY STRATEGY:\s*Partial Release/i.test(card.desc);
+  token: string,
+): Promise<boolean> {
+  const isPartial = /DELIVERY STRATEGY:\s*Partial Release/i.test(card.desc);
 
-  if (!isPartial) return false;
+  if (!isPartial) {
+    return false;
+  }
 
-  const checklists = await getCardChecklists(card.id, key, token);
+  const existingChecklists = await getCardChecklists(card.id, key, token);
 
-  const hasChecklist = checklists.some(
-    (checklist: { name: string }) =>
-      checklist.name.toUpperCase() === "INITIAL COMMITMENT"
+  const matchingChecklists = findChecklistsByName(
+    existingChecklists,
+    "Initial Commitment",
   );
 
-  if (hasChecklist) return false;
+  if (matchingChecklists.length > 1) {
+    const checklistToKeep = chooseChecklistToKeep(
+      matchingChecklists,
+      "Initial Release Completed",
+    );
+
+    await deleteDuplicateChecklists(
+      matchingChecklists,
+      checklistToKeep,
+      key,
+      token,
+    );
+
+    return false;
+  }
+
+  if (matchingChecklists.length === 1) {
+    return false;
+  }
 
   const createChecklistRes = await fetch(
     `https://api.trello.com/1/checklists?key=${key}&token=${token}`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         idCard: card.id,
         name: "Initial Commitment",
       }),
-    }
+    },
   );
 
-  if (!createChecklistRes.ok) return false;
+  if (!createChecklistRes.ok) {
+    throw new Error(
+      `Failed to create Initial Commitment checklist for card ${card.id}`,
+    );
+  }
 
-  const checklist = await createChecklistRes.json();
+  const createdChecklist = (await createChecklistRes.json()) as TrelloChecklist;
 
-  await fetch(
-    `https://api.trello.com/1/checklists/${checklist.id}/checkItems?key=${key}&token=${token}`,
+  const createItemRes = await fetch(
+    `https://api.trello.com/1/checklists/${createdChecklist.id}/checkItems?key=${key}&token=${token}`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         name: "Initial Release Completed",
         checked: false,
       }),
-    }
+    },
   );
+
+  if (!createItemRes.ok) {
+    throw new Error(
+      `Checklist was created, but its item could not be created for card ${card.id}`,
+    );
+  }
+
+  const verifiedChecklists = await getCardChecklists(card.id, key, token);
+
+  const verifiedMatches = findChecklistsByName(
+    verifiedChecklists,
+    "Initial Commitment",
+  );
+
+  if (verifiedMatches.length > 1) {
+    const checklistToKeep = chooseChecklistToKeep(
+      verifiedMatches,
+      "Initial Release Completed",
+      createdChecklist.id,
+    );
+
+    await deleteDuplicateChecklists(
+      verifiedMatches,
+      checklistToKeep,
+      key,
+      token,
+    );
+  }
 
   return true;
 }
@@ -284,26 +482,15 @@ async function ensureInitialCommitmentChecklist(
 async function isInitialCommitmentCompleted(
   cardId: string,
   key: string,
-  token: string
-) {
+  token: string,
+): Promise<boolean> {
   const checklists = await getCardChecklists(cardId, key, token);
 
-  for (const checklist of checklists as {
-    name: string;
-    checkItems?: { name: string; state: string }[];
-  }[]) {
-    if (checklist.name.toUpperCase() !== "INITIAL COMMITMENT") continue;
-
-    return (
-      checklist.checkItems?.some(
-        (item) =>
-          item.name.toUpperCase() === "INITIAL RELEASE COMPLETED" &&
-          item.state === "complete"
-      ) || false
-    );
-  }
-
-  return false;
+  return checklists.some(
+    (checklist) =>
+      normalize(checklist.name) === "INITIAL COMMITMENT" &&
+      hasCompletedCheckItem(checklist, "Initial Release Completed"),
+  );
 }
 
 async function setDueDateIfProductionStarted({
@@ -329,16 +516,13 @@ async function setDueDateIfProductionStarted({
 
   const actions = await getCardMoveActions(card.id, key, token);
 
-  const station1StartedRaw = findFirstMoveInto(
-    actions,
-    PRODUCTION_START_LIST
-  );
+  const station1StartedRaw = findFirstMoveInto(actions, PRODUCTION_START_LIST);
 
   if (!station1StartedRaw) return false;
 
   const existingProductionStart = extractLineValue(
     card.desc,
-    "PRODUCTION START"
+    "PRODUCTION START",
   );
 
   const deliveryStrategyIsPartial =
@@ -347,42 +531,39 @@ async function setDueDateIfProductionStarted({
   const initialDueMatch = card.desc.match(/INITIAL DUE WD:\s*(\d+)/i);
   const finalDueMatch = card.desc.match(/FINAL DUE WD:\s*(\d+)/i);
 
-  const initialWorkingDays = initialDueMatch
-    ? Number(initialDueMatch[1])
-    : 10;
+  const initialWorkingDays = initialDueMatch ? Number(initialDueMatch[1]) : 10;
 
   const finalWorkingDays = finalDueMatch
     ? Number(finalDueMatch[1])
     : initialWorkingDays;
 
-  const productionStartForDue = existingProductionStart &&
-    existingProductionStart !== "Not Started"
-    ? existingProductionStart
-    : station1StartedRaw;
+  const productionStartForDue =
+    existingProductionStart && existingProductionStart !== "Not Started"
+      ? existingProductionStart
+      : station1StartedRaw;
 
   const priority = getPriorityFromLabels(card);
 
-  const completeOrderWorkingDays =
-    priority === "rush" ? 3 : finalWorkingDays;
+  const completeOrderWorkingDays = priority === "rush" ? 3 : finalWorkingDays;
 
   const initialDueDate = calculateDueDateFromStart(
     productionStartForDue,
-    initialWorkingDays
+    initialWorkingDays,
   );
 
   const finalDueDate = calculateDueDateFromStart(
     productionStartForDue,
-    deliveryStrategyIsPartial ? finalWorkingDays : completeOrderWorkingDays
+    deliveryStrategyIsPartial ? finalWorkingDays : completeOrderWorkingDays,
   );
 
   const initialCommitmentCompleted = deliveryStrategyIsPartial
-  ? await isInitialCommitmentCompleted(card.id, key, token)
-  : false;
+    ? await isInitialCommitmentCompleted(card.id, key, token)
+    : false;
 
-const trelloDueDate =
-  deliveryStrategyIsPartial && !initialCommitmentCompleted
-    ? initialDueDate
-    : finalDueDate;
+  const trelloDueDate =
+    deliveryStrategyIsPartial && !initialCommitmentCompleted
+      ? initialDueDate
+      : finalDueDate;
 
   let updatedDesc = card.desc;
 
@@ -394,19 +575,19 @@ const trelloDueDate =
   updatedDesc = replaceOrAddLine(
     updatedDesc,
     "PRODUCTION START",
-    productionStartValue
+    productionStartValue,
   );
 
   updatedDesc = replaceOrAddLine(
     updatedDesc,
     "INITIAL DUE DATE",
-    deliveryStrategyIsPartial ? formatDateOnly(initialDueDate) : "-"
+    deliveryStrategyIsPartial ? formatDateOnly(initialDueDate) : "-",
   );
 
   updatedDesc = replaceOrAddLine(
     updatedDesc,
     "FINAL DUE DATE",
-    formatDateOnly(finalDueDate)
+    formatDateOnly(finalDueDate),
   );
 
   updatedDesc = replaceOrAddLine(
@@ -416,27 +597,21 @@ const trelloDueDate =
       ? initialCommitmentCompleted
         ? "Completed"
         : "Pending"
-      : "-"
+      : "-",
   );
 
-  const currentInitialDue = extractLineValue(
-    card.desc,
-    "INITIAL DUE DATE"
-  );
+  const currentInitialDue = extractLineValue(card.desc, "INITIAL DUE DATE");
 
-  const currentFinalDue = extractLineValue(
-    card.desc,
-    "FINAL DUE DATE"
-  );
+  const currentFinalDue = extractLineValue(card.desc, "FINAL DUE DATE");
 
   const currentProductionStart = extractLineValue(
     card.desc,
-    "PRODUCTION START"
+    "PRODUCTION START",
   );
 
   const currentCommitmentStatus = extractLineValue(
     card.desc,
-    "INITIAL COMMITMENT STATUS"
+    "INITIAL COMMITMENT STATUS",
   );
 
   const expectedInitialDue = deliveryStrategyIsPartial
@@ -445,12 +620,11 @@ const trelloDueDate =
 
   const expectedFinalDue = formatDateOnly(finalDueDate);
 
-  const expectedCommitmentStatus =
-    deliveryStrategyIsPartial
-      ? initialCommitmentCompleted
-        ? "Completed"
-        : "Pending"
-      : "-";
+  const expectedCommitmentStatus = deliveryStrategyIsPartial
+    ? initialCommitmentCompleted
+      ? "Completed"
+      : "Pending"
+    : "-";
 
   const descriptionAlreadyLatest =
     currentProductionStart === productionStartValue &&
@@ -458,18 +632,11 @@ const trelloDueDate =
     currentFinalDue === expectedFinalDue &&
     currentCommitmentStatus === expectedCommitmentStatus;
 
-  const currentDue =
-    card.due
-      ? formatDateOnly(card.due)
-      : "";
+  const currentDue = card.due ? formatDateOnly(card.due) : "";
 
-  const expectedDue =
-    formatDateOnly(trelloDueDate);
+  const expectedDue = formatDateOnly(trelloDueDate);
 
-  if (
-    currentDue === expectedDue &&
-    descriptionAlreadyLatest
-  ) {
+  if (currentDue === expectedDue && descriptionAlreadyLatest) {
     return false;
   }
   const res = await fetch(
@@ -481,194 +648,211 @@ const trelloDueDate =
         due: trelloDueDate,
         desc: updatedDesc,
       }),
-    }
+    },
   );
 
   return res.ok;
 }
 
-export async function runProductionSync() {
-    const key = process.env.TRELLO_KEY;
-    const token = process.env.TRELLO_TOKEN;
-    const boardId = process.env.TRELLO_BOARD_ID;
+let activeProductionSync: Promise<ProductionSyncResult> | null = null;
 
-      if (!key || !token || !boardId) {
-          throw new Error("Missing Trello environment variables");
-      }
+async function executeProductionSync(): Promise<ProductionSyncResult> {
+  const key = process.env.TRELLO_KEY;
+  const token = process.env.TRELLO_TOKEN;
+  const boardId = process.env.TRELLO_BOARD_ID;
 
-    const [listsRes, cardsRes] = await Promise.all([
-      fetch(
-        `https://api.trello.com/1/boards/${boardId}/lists?key=${key}&token=${token}`,
-        { cache: "no-store" }
-      ),
-      fetch(
-        `https://api.trello.com/1/boards/${boardId}/cards?fields=id,name,desc,idList,due,labels&key=${key}&token=${token}`,
-        { cache: "no-store" }
-      ),
-    ]);
+  if (!key || !token || !boardId) {
+    throw new Error("Missing Trello environment variables");
+  }
 
-      if (!listsRes.ok || !cardsRes.ok) {
-          throw new Error("Failed to load Trello board data");
-      }
+  const [listsRes, cardsRes] = await Promise.all([
+    fetch(
+      `https://api.trello.com/1/boards/${boardId}/lists?key=${key}&token=${token}`,
+      { cache: "no-store" },
+    ),
+    fetch(
+      `https://api.trello.com/1/boards/${boardId}/cards?fields=id,name,desc,idList,due,labels&key=${key}&token=${token}`,
+      { cache: "no-store" },
+    ),
+  ]);
 
-    const lists = (await listsRes.json()) as TrelloList[];
-    const cards = (await cardsRes.json()) as TrelloCard[];
+  if (!listsRes.ok || !cardsRes.ok) {
+    throw new Error("Failed to load Trello board data");
+  }
 
-    const listMap = new Map(lists.map((list) => [list.id, list.name]));
+  const lists = (await listsRes.json()) as TrelloList[];
+  const cards = (await cardsRes.json()) as TrelloCard[];
 
-    let checklistsCreated = 0;
-    let dueDatesCreated = 0;
-    let archived = 0;
-    let trelloCardsArchived = 0;
-    let skipped = 0;
-    const errors: string[] = [];
+  const listMap = new Map(lists.map((list) => [list.id, list.name]));
 
-    for (const card of cards) {
-      const currentList = listMap.get(card.idList) || "";
+  let checklistsCreated = 0;
+  let dueDatesCreated = 0;
+  let archived = 0;
+  let trelloCardsArchived = 0;
+  let skipped = 0;
+  const errors: string[] = [];
 
-      const dueCreated = await setDueDateIfProductionStarted({
-        card,
-        currentList,
-        key,
-        token,
-      });
+  for (const card of cards) {
+    const currentList = listMap.get(card.idList) || "";
 
-      if (dueCreated) dueDatesCreated++;
+    const dueCreated = await setDueDateIfProductionStarted({
+      card,
+      currentList,
+      key,
+      token,
+    });
 
-      if (isInList(currentList, [PRODUCTION_START_LIST])) {
-        const created = await ensureInitialCommitmentChecklist(card, key, token);
-        if (created) checklistsCreated++;
-      }
+    if (dueCreated) dueDatesCreated++;
 
-      if (isInList(currentList, CHECKLIST_REQUIRED_LISTS)) {
-        const created = await ensureStatusChecklist(card.id, key, token);
-        if (created) checklistsCreated++;
-      }
+    if (isInList(currentList, [PRODUCTION_START_LIST])) {
+      const created = await ensureInitialCommitmentChecklist(card, key, token);
+      if (created) checklistsCreated++;
+    }
 
-      if (isInList(currentList, ARCHIVE_LISTS)) {
-        const actions = await getCardMoveActions(card.id, key, token);
+    if (isInList(currentList, CHECKLIST_REQUIRED_LISTS)) {
+      const created = await ensureStatusChecklist(card.id, key, token);
+      if (created) checklistsCreated++;
+    }
 
-        const releasedDateRaw =
-          findFirstMoveInto(actions, "Delivered by LIC") ||
-          findFirstMoveInto(actions, "Picked Up by Client") ||
-          new Date().toISOString();
+    if (isInList(currentList, ARCHIVE_LISTS)) {
+      const actions = await getCardMoveActions(card.id, key, token);
 
-        const alreadyArchived =
-          (await findBIRProductionRecordByCardId(card.id)) ||
-          (await findNonBIRProductionRecordByCardId(card.id));
+      const releasedDateRaw =
+        findFirstMoveInto(actions, "Delivered by LIC") ||
+        findFirstMoveInto(actions, "Picked Up by Client") ||
+        new Date().toISOString();
 
-        if (!alreadyArchived) {
-          const receivedATP = await findReceivedATPByCardId(card.id);
-          const nonBIROrder = await findNonBIROrderByCardId(card.id);
+      const alreadyArchived =
+        (await findBIRProductionRecordByCardId(card.id)) ||
+        (await findNonBIRProductionRecordByCardId(card.id));
 
-          const productionStartedRaw = findFirstMoveInto(
-            actions,
-            PRODUCTION_START_LIST
-          );
+      if (!alreadyArchived) {
+        const receivedATP = await findReceivedATPByCardId(card.id);
+        const nonBIROrder = await findNonBIROrderByCardId(card.id);
 
-          const completedDateRaw = findFirstMoveInto(actions, COMPLETED_LIST);
+        const productionStartedRaw = findFirstMoveInto(
+          actions,
+          PRODUCTION_START_LIST,
+        );
 
-          const productionStarted = productionStartedRaw
-            ? formatPHDateTime(productionStartedRaw)
+        const completedDateRaw = findFirstMoveInto(actions, COMPLETED_LIST);
+
+        const productionStarted = productionStartedRaw
+          ? formatPHDateTime(productionStartedRaw)
+          : "";
+
+        const completedDate = completedDateRaw
+          ? formatPHDateTime(completedDateRaw)
+          : "";
+
+        const releasedDate = formatPHDateTime(releasedDateRaw);
+
+        const finalStatus = currentList;
+
+        const productionTime =
+          productionStarted && completedDate
+            ? calculateProductionTime(productionStartedRaw, completedDateRaw)
             : "";
 
-          const completedDate = completedDateRaw
-            ? formatPHDateTime(completedDateRaw)
-            : "";
+        if (receivedATP) {
+          const receivedRow = receivedATP.row;
 
-          const releasedDate = formatPHDateTime(releasedDateRaw);
+          const birRowWithoutTimestamp = receivedRow.slice(1);
 
-          const finalStatus = currentList;
+          const productionRecordRow = [
+            ...birRowWithoutTimestamp,
+            productionStarted,
+            completedDate,
+            releasedDate,
+            finalStatus,
+            productionTime,
+          ];
 
-          const productionTime =
-            productionStarted && completedDate
-              ? calculateProductionTime(productionStartedRaw, completedDateRaw)
-              : "";
+          const birStillNotArchived = !(await findBIRProductionRecordByCardId(
+            card.id,
+          ));
 
-          if (receivedATP) {
-            const receivedRow = receivedATP.row;
-
-            const birRowWithoutTimestamp = receivedRow.slice(1);
-
-            const productionRecordRow = [
-              ...birRowWithoutTimestamp,
-              productionStarted,
-              completedDate,
-              releasedDate,
-              finalStatus,
-              productionTime,
-            ];
-
-            const birStillNotArchived = !(await findBIRProductionRecordByCardId(card.id));
-
-            if (birStillNotArchived) {
-              await appendBIRProductionRecord(productionRecordRow);
-              archived++;
-            } else {
-              skipped++;
-            }
-          } else if (nonBIROrder) {
-            const nonBirRow = nonBIROrder.row;
-
-            const productionRecordRow = [
-              nonBirRow[0] || "",
-              nonBirRow[2] || "",
-              nonBirRow[3] || "",
-              nonBirRow[4] || "",
-              nonBirRow[5] || "",
-              nonBirRow[6] || "",
-              nonBirRow[7] || card.id,
-              productionStarted,
-              completedDate,
-              releasedDate,
-              finalStatus,
-              productionTime,
-            ];
-
-            const nonBirStillNotArchived = !(
-              await findNonBIRProductionRecordByCardId(card.id)
-            );
-
-            if (nonBirStillNotArchived) {
-              await appendNonBIRProductionRecord(productionRecordRow);
-              archived++;
-            } else {
-              skipped++;
-            }
+          if (birStillNotArchived) {
+            await appendBIRProductionRecord(productionRecordRow);
+            archived++;
           } else {
             skipped++;
-            errors.push(`No source record found for card: ${card.name}`);
+          }
+        } else if (nonBIROrder) {
+          const nonBirRow = nonBIROrder.row;
+
+          const productionRecordRow = [
+            nonBirRow[0] || "",
+            nonBirRow[2] || "",
+            nonBirRow[3] || "",
+            nonBirRow[4] || "",
+            nonBirRow[5] || "",
+            nonBirRow[6] || "",
+            nonBirRow[7] || card.id,
+            productionStarted,
+            completedDate,
+            releasedDate,
+            finalStatus,
+            productionTime,
+          ];
+
+          const nonBirStillNotArchived =
+            !(await findNonBIRProductionRecordByCardId(card.id));
+
+          if (nonBirStillNotArchived) {
+            await appendNonBIRProductionRecord(productionRecordRow);
+            archived++;
+          } else {
+            skipped++;
           }
         } else {
           skipped++;
+          errors.push(`No source record found for card: ${card.name}`);
         }
+      } else {
+        skipped++;
+      }
 
-        if (isOlderThanDays(releasedDateRaw, AUTO_ARCHIVE_AFTER_DAYS)) {
-          const trelloArchived = await archiveTrelloCard(card.id, key, token);
+      if (isOlderThanDays(releasedDateRaw, AUTO_ARCHIVE_AFTER_DAYS)) {
+        const trelloArchived = await archiveTrelloCard(card.id, key, token);
 
-          if (trelloArchived) {
-            trelloCardsArchived++;
-          }
+        if (trelloArchived) {
+          trelloCardsArchived++;
         }
       }
     }
+  }
 
-    const hasChanges =
-      checklistsCreated > 0 ||
-      dueDatesCreated > 0 ||
-      archived > 0 ||
-      trelloCardsArchived > 0;
+  const hasChanges =
+    checklistsCreated > 0 ||
+    dueDatesCreated > 0 ||
+    archived > 0 ||
+    trelloCardsArchived > 0;
 
-      return {
-          success: true,
-          cardsChecked: cards.length,
-          checklistsCreated,
-          dueDatesCreated,
-          archived,
-          trelloCardsArchived,
-          skipped,
-          errors,
-          changed: hasChanges,
-          lastUpdated: hasChanges ? new Date().toISOString() : null,
-      };
+  return {
+    success: true,
+    cardsChecked: cards.length,
+    checklistsCreated,
+    dueDatesCreated,
+    archived,
+    trelloCardsArchived,
+    skipped,
+    errors,
+    changed: hasChanges,
+    lastUpdated: hasChanges ? new Date().toISOString() : null,
+  };
+}
+
+export async function runProductionSync(): Promise<ProductionSyncResult> {
+  if (activeProductionSync) {
+    return activeProductionSync;
+  }
+
+  activeProductionSync = executeProductionSync();
+
+  try {
+    return await activeProductionSync;
+  } finally {
+    activeProductionSync = null;
+  }
 }

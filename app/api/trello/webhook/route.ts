@@ -20,8 +20,6 @@ export async function POST(req: Request) {
     const allowedActions = [
       "updateCard",
       "updateCheckItemStateOnCard",
-      "addChecklistToCard",
-      "createCheckItem",
     ];
 
     if (!allowedActions.includes(actionType)) {
