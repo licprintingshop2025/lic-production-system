@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     if (!key || !token || !intakeListId) {
       return NextResponse.json(
         { error: "Missing Trello environment variables." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     if (documents.length === 0) {
       return NextResponse.json(
         { error: "Please add at least one document." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
           name: cardName,
           desc: cardDesc,
         }),
-      }
+      },
     );
 
     if (!trelloRes.ok) {
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
           error: "Failed to create Trello card.",
           details: await trelloRes.text(),
         },
-        { status: trelloRes.status }
+        { status: trelloRes.status },
       );
     }
 
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
             ? error.message
             : "Failed to save Non-BIR order.",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

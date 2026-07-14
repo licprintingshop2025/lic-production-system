@@ -10,7 +10,7 @@ export async function GET() {
     if (!key || !token || !boardId || !appUrl) {
       return NextResponse.json(
         { error: "Missing Trello or app environment variables." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -28,7 +28,7 @@ export async function GET() {
       `https://api.trello.com/1/webhooks?${params.toString()}`,
       {
         method: "POST",
-      }
+      },
     );
 
     const text = await res.text();
@@ -40,7 +40,7 @@ export async function GET() {
           status: res.status,
           trelloResponse: text,
         },
-        { status: res.status }
+        { status: res.status },
       );
     }
 
@@ -64,7 +64,7 @@ export async function GET() {
             ? error.message
             : "Webhook registration failed.",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

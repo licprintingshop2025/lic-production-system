@@ -98,160 +98,154 @@ export default function NewEmployeePage() {
   }
 
   return (
-    <AppShell activePage="employees">
-      <div className="mx-auto max-w-[1200px]">
-        <PageHeader
-          title="New Employee"
-          description="Add a new employee, assign production skills, set employment type, shift, and station capacity."
-        />
+    <AppShell activePage="employees" contentWidth="wide">
+      <PageHeader
+        title="New Employee"
+        description="Add a new employee, assign production skills, set employment type, shift, and station capacity."
+      />
 
-        <section className="mt-7 rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-black">
-            Employee Information
-          </h2>
+      <section className="mt-7 rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-bold text-black">Employee Information</h2>
 
-          <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
-            <Field label="Employee ID">
-              <input
-                value={employee.employeeId}
-                onChange={(e) => updateField("employeeId", e.target.value)}
-                placeholder="Example: EMP-012"
-                className="w-full rounded-lg border border-[#e6ddd1] bg-white p-3 text-black outline-none focus:border-[#c89132]"
-              />
-            </Field>
+        <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+          <Field label="Employee ID">
+            <input
+              value={employee.employeeId}
+              onChange={(e) => updateField("employeeId", e.target.value)}
+              placeholder="Example: EMP-012"
+              className="w-full rounded-lg border border-[#e6ddd1] bg-white p-3 text-black outline-none focus:border-[#c89132]"
+            />
+          </Field>
 
-            <Field label="Name">
-              <input
-                value={employee.name}
-                onChange={(e) => updateField("name", e.target.value)}
-                placeholder="Employee full name"
-                className="w-full rounded-lg border border-[#e6ddd1] bg-white p-3 text-black outline-none focus:border-[#c89132]"
-              />
-            </Field>
+          <Field label="Name">
+            <input
+              value={employee.name}
+              onChange={(e) => updateField("name", e.target.value)}
+              placeholder="Employee full name"
+              className="w-full rounded-lg border border-[#e6ddd1] bg-white p-3 text-black outline-none focus:border-[#c89132]"
+            />
+          </Field>
 
-            <Field label="Position">
-              <input
-                value={employee.position}
-                onChange={(e) => updateField("position", e.target.value)}
-                placeholder="Example: Skilled Worker"
-                className="w-full rounded-lg border border-[#e6ddd1] bg-white p-3 text-black outline-none focus:border-[#c89132]"
-              />
-            </Field>
+          <Field label="Position">
+            <input
+              value={employee.position}
+              onChange={(e) => updateField("position", e.target.value)}
+              placeholder="Example: Skilled Worker"
+              className="w-full rounded-lg border border-[#e6ddd1] bg-white p-3 text-black outline-none focus:border-[#c89132]"
+            />
+          </Field>
 
-            <Field label="Status">
-              <select
-                value={employee.status}
-                onChange={(e) => updateField("status", e.target.value)}
-                className="w-full rounded-lg border border-[#e6ddd1] bg-white p-3 text-black outline-none focus:border-[#c89132]"
+          <Field label="Status">
+            <select
+              value={employee.status}
+              onChange={(e) => updateField("status", e.target.value)}
+              className="w-full rounded-lg border border-[#e6ddd1] bg-white p-3 text-black outline-none focus:border-[#c89132]"
+            >
+              <option>Active</option>
+              <option>Inactive</option>
+            </select>
+          </Field>
+
+          <Field label="Shift">
+            <select
+              value={employee.shift}
+              onChange={(e) => updateField("shift", e.target.value)}
+              className="w-full rounded-lg border border-[#e6ddd1] bg-white p-3 text-black outline-none focus:border-[#c89132]"
+            >
+              <option>Whole Day</option>
+              <option>AM Shift</option>
+              <option>PM Shift</option>
+              <option>Part Time</option>
+              <option>OJT</option>
+            </select>
+          </Field>
+
+          <Field label="Employment Type">
+            <select
+              value={employee.employmentType}
+              onChange={(e) => updateField("employmentType", e.target.value)}
+              className="w-full rounded-lg border border-[#e6ddd1] bg-white p-3 text-black outline-none focus:border-[#c89132]"
+            >
+              <option>Full-time</option>
+              <option>Part-time</option>
+              <option>OJT</option>
+              <option>Contractual</option>
+            </select>
+          </Field>
+
+          <Field label="Maximum Stations">
+            <input
+              type="number"
+              min={1}
+              value={employee.maxStations}
+              onChange={(e) =>
+                updateField("maxStations", Number(e.target.value))
+              }
+              className="w-full rounded-lg border border-[#e6ddd1] bg-white p-3 text-black outline-none focus:border-[#c89132]"
+            />
+          </Field>
+        </div>
+      </section>
+
+      <section className="mt-5 rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-bold text-black">Production Skills</h2>
+        <p className="mt-1 text-sm text-[#5f5448]">
+          Select all stations this employee can work on.
+        </p>
+
+        <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">
+          {STATION_SKILLS.map((skill) => {
+            const checked = employee.skills.includes(skill);
+
+            return (
+              <label
+                key={skill}
+                className={`flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition ${
+                  checked
+                    ? "border-[#d6b25e] bg-[#fbf1d8]"
+                    : "border-[#e6ddd1] bg-white hover:bg-[#fbf7ef]"
+                }`}
               >
-                <option>Active</option>
-                <option>Inactive</option>
-              </select>
-            </Field>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleSkill(skill)}
+                  className="h-4 w-4"
+                />
 
-            <Field label="Shift">
-              <select
-                value={employee.shift}
-                onChange={(e) => updateField("shift", e.target.value)}
-                className="w-full rounded-lg border border-[#e6ddd1] bg-white p-3 text-black outline-none focus:border-[#c89132]"
-              >
-                <option>Whole Day</option>
-                <option>AM Shift</option>
-                <option>PM Shift</option>
-                <option>Part Time</option>
-                <option>OJT</option>
-              </select>
-            </Field>
+                <span className="text-sm font-semibold text-black">
+                  {skill}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </section>
 
-            <Field label="Employment Type">
-              <select
-                value={employee.employmentType}
-                onChange={(e) =>
-                  updateField("employmentType", e.target.value)
-                }
-                className="w-full rounded-lg border border-[#e6ddd1] bg-white p-3 text-black outline-none focus:border-[#c89132]"
-              >
-                <option>Full-time</option>
-                <option>Part-time</option>
-                <option>OJT</option>
-                <option>Contractual</option>
-              </select>
-            </Field>
-
-            <Field label="Maximum Stations">
-              <input
-                type="number"
-                min={1}
-                value={employee.maxStations}
-                onChange={(e) =>
-                  updateField("maxStations", Number(e.target.value))
-                }
-                className="w-full rounded-lg border border-[#e6ddd1] bg-white p-3 text-black outline-none focus:border-[#c89132]"
-              />
-            </Field>
-          </div>
-        </section>
-
-        <section className="mt-5 rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-black">Production Skills</h2>
-          <p className="mt-1 text-sm text-[#5f5448]">
-            Select all stations this employee can work on.
+      <div className="mt-8 border-t border-[#e6ddd1] bg-[#fffaf2] px-6 py-5 lg:px-8">
+        <div className="mx-auto flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-[#6f6254]">
+            Creating this employee will add a new row to the Google Sheets
+            Employee Database.
           </p>
 
-          <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">
-            {STATION_SKILLS.map((skill) => {
-              const checked = employee.skills.includes(skill);
+          <div className="flex shrink-0 justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => router.push("/employees")}
+              className="rounded-lg border border-[#e6ddd1] bg-white px-6 py-3 text-sm font-bold text-black transition hover:bg-[#fbf7ef]"
+            >
+              Cancel
+            </button>
 
-              return (
-                <label
-                  key={skill}
-                  className={`flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition ${
-                    checked
-                      ? "border-[#d6b25e] bg-[#fbf1d8]"
-                      : "border-[#e6ddd1] bg-white hover:bg-[#fbf7ef]"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleSkill(skill)}
-                    className="h-4 w-4"
-                  />
-
-                  <span className="text-sm font-semibold text-black">
-                    {skill}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </section>
-
-        <div className="sticky bottom-0 z-20 -mx-6 mt-8 border-t border-[#e6ddd1] bg-[#fffaf2]/95 px-6 py-5 backdrop-blur lg:-mx-8 lg:px-8">
-          <div className="mx-auto flex max-w-[1200px] flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <p className="text-xs text-[#6f6254]">
-              Creating this employee will add a new row to the Google Sheets
-              Employee Database.
-            </p>
-
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => router.push("/employees")}
-                className="rounded-lg border border-[#e6ddd1] bg-white px-6 py-3 text-sm font-bold text-black hover:bg-[#fbf7ef]"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={handleCreate}
-                disabled={saving}
-                className="rounded-lg bg-[#e1bb5f] px-8 py-3 text-sm font-black text-black hover:bg-[#edca73] disabled:opacity-60"
-              >
-                {saving ? "Creating..." : "Create Employee"}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleCreate}
+              disabled={saving}
+              className="rounded-lg bg-[#e1bb5f] px-8 py-3 text-sm font-black text-black transition hover:bg-[#edca73] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? "Creating..." : "Create Employee"}
+            </button>
           </div>
         </div>
       </div>

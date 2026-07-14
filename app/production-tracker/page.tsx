@@ -93,226 +93,248 @@ export default async function ProductionTrackerPage() {
   const rows = await getTrackerRows();
 
   const rushCount = rows.filter(
-    (row) => row.orderPriority?.toLowerCase() === "rush"
+    (row) => row.orderPriority?.toLowerCase() === "rush",
   ).length;
 
   const readyCount = rows.filter((row) =>
-    row.currentStation?.toUpperCase().includes("READY FOR RELEASE")
+    row.currentStation?.toUpperCase().includes("READY FOR RELEASE"),
   ).length;
 
   const overdueCount = rows.filter((row) => row.daysRemaining < 0).length;
   const dueTodayCount = rows.filter((row) => row.daysRemaining === 0).length;
 
   return (
-    <AppShell activePage="production-tracker">
+    <AppShell activePage="production-tracker" contentWidth="wide">
       <ProductionSyncRunner />
-      <div className="mx-auto w-full max-w-[1800px]">
-        <PageHeader
-          title="Production Tracker"
-          description="Monitor every production job with tracking number, business details, priority, current station, due date, and remaining processing time."
+
+      <PageHeader
+        title="Production Tracker"
+        description="Monitor every production job with tracking number, business details, priority, current station, due date, and remaining processing time."
+      />
+
+      <section className="mt-7 grid grid-cols-1 gap-4 md:grid-cols-4">
+        <TrackerStat
+          title="Total Jobs"
+          value={rows.length}
+          subtitle="Active records"
         />
+        <TrackerStat
+          title="Rush Jobs"
+          value={rushCount}
+          subtitle="High priority"
+        />
+        <TrackerStat
+          title="Due Today"
+          value={dueTodayCount}
+          subtitle="Needs attention"
+        />
+        <TrackerStat
+          title="Overdue"
+          value={overdueCount}
+          subtitle="Past due date"
+        />
+      </section>
 
-        <section className="mt-7 grid grid-cols-1 gap-4 md:grid-cols-4">
-          <TrackerStat
-            title="Total Jobs"
-            value={rows.length}
-            subtitle="Active records"
-          />
-          <TrackerStat
-            title="Rush Jobs"
-            value={rushCount}
-            subtitle="High priority"
-          />
-          <TrackerStat
-            title="Due Today"
-            value={dueTodayCount}
-            subtitle="Needs attention"
-          />
-          <TrackerStat
-            title="Overdue"
-            value={overdueCount}
-            subtitle="Past due date"
-          />
-        </section>
-
-        <section className="mt-5 overflow-hidden rounded-xl border border-[#e6ddd1] bg-white shadow-sm">
-          <div className="flex flex-col justify-between gap-4 border-b border-[#eee4d6] p-6 md:flex-row md:items-center">
-            <div>
-              <h2 className="text-xl font-bold text-black">
-                Live Production Records
-              </h2>
-              <p className="mt-1 text-sm text-[#5f5448]">
-                Source: Trello production board
-              </p>
-            </div>
-
-            <span className="rounded-lg border border-[#e6ddd1] bg-white px-4 py-2 text-sm font-bold text-[#8b5e24]">
-              Ready for Release: {readyCount}
-            </span>
+      <section className="mt-5 overflow-hidden rounded-xl border border-[#e6ddd1] bg-white shadow-sm">
+        <div className="flex flex-col justify-between gap-4 border-b border-[#eee4d6] p-6 md:flex-row md:items-center">
+          <div>
+            <h2 className="text-xl font-bold text-black">
+              Live Production Records
+            </h2>
+            <p className="mt-1 text-sm text-[#5f5448]">
+              Source: Trello production board
+            </p>
           </div>
 
-          <div className="max-h-[calc(100vh-360px)] overflow-auto">
-            <table className="w-full min-w-[1280px] text-left text-sm">
-              <thead className="sticky top-0 z-20 bg-[#fbf7ef] text-[#5f5448]">
+          <span className="rounded-lg border border-[#e6ddd1] bg-white px-4 py-2 text-sm font-bold text-[#8b5e24]">
+            Ready for Release: {readyCount}
+          </span>
+        </div>
+
+        <div className="max-h-[calc(100vh-390px)] min-h-[360px] overflow-auto">
+          <table className="w-full min-w-[1280px] text-left text-sm">
+            <thead className="sticky top-0 z-20 bg-[#fbf7ef] text-[#5f5448] shadow-sm">
+              <tr>
+                <th className="p-4">Tracking No.</th>
+                <th className="p-4">Business Name</th>
+                <th className="p-4 text-center">Qty</th>
+                <th className="p-4">Serial</th>
+                <th className="p-4">Receipt Type</th>
+                <th className="p-4">Paper</th>
+                <th className="w-[80px] min-w-[80px] p-4">Ply</th>
+                <th className="p-4">Size</th>
+                <th className="p-4">Priority</th>
+                <th className="p-4">Delivery</th>
+                <th className="w-[120px] min-w-[120px] p-4">Station</th>
+                <th className="p-4">Arrival</th>
+                <th className="p-4">Proc. Hrs</th>
+                <th className="w-[155px] min-w-[155px] p-4">Due Date</th>
+                <th className="w-[110px] min-w-[110px] p-4">Days Left</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {rows.length === 0 ? (
                 <tr>
-                  <th className="p-4">Tracking No.</th>
-                  <th className="p-4">Business Name</th>
-                  <th className="p-4 text-center">Qty</th>
-                  <th className="p-4">Serial</th>
-                  <th className="p-4">Receipt Type</th>
-                  <th className="p-4">Paper</th>
-                  <th className="p-4">Ply</th>
-                  <th className="p-4">Size</th>
-                  <th className="p-4">Priority</th>
-                  <th className="p-4">Delivery</th>
-                  <th className="p-4">Station</th>
-                  <th className="p-4">Arrival</th>
-                  <th className="p-4">Proc. Hrs</th>
-                  <th className="p-4">Due Date</th>
-                  <th className="p-4">Days Left</th>
+                  <td colSpan={15} className="p-8 text-center text-[#6f6254]">
+                    No production records found.
+                  </td>
                 </tr>
-              </thead>
+              ) : (
+                rows.map((row) => {
+                  const daysBadge = getDaysBadge(row.daysRemaining);
+                  const isRush = row.orderPriority?.toLowerCase() === "rush";
 
-              <tbody>
-                {rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={15} className="p-8 text-center text-[#6f6254]">
-                      No production records found.
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((row) => {
-                    const daysBadge = getDaysBadge(row.daysRemaining);
-                    const isRush =
-                      row.orderPriority?.toLowerCase() === "rush";
+                  return (
+                    <tr
+                      key={row.id}
+                      className="border-t border-[#eee4d6] transition hover:bg-[#fbf7ef]"
+                    >
+                      <td className="p-4 font-bold">
+                        <a
+                          href={`/production/${row.id}`}
+                          className="text-[#9b6a22] hover:underline"
+                        >
+                          {row.trackingNo || "-"}
+                        </a>
+                      </td>
 
-                    return (
-                      <tr
-                        key={row.id}
-                        className="border-t border-[#eee4d6] transition hover:bg-[#fbf7ef]"
-                      >
-                        <td className="p-4 font-bold">
-                          <a
-                            href={`/production/${row.id}`}
-                            className="text-[#9b6a22] hover:underline"
-                          >
-                            {row.trackingNo || "-"}
-                          </a>
-                        </td>
+                      <td className="w-[260px] p-4 font-bold text-black">
+                        <div
+                          className="line-clamp-2 leading-5"
+                          title={row.businessName || "-"}
+                        >
+                          {row.businessName || "-"}
+                        </div>
+                      </td>
 
-                        <td className="max-w-[220px] p-4 font-bold text-black">
-                          <span className="line-clamp-2">
-                            {row.businessName || "-"}
-                          </span>
-                        </td>
+                      <td className="p-4 text-center">
+                        {row.orderQuantity || "-"}
+                      </td>
 
-                        <td className="p-4 text-center">
-                          {row.orderQuantity || "-"}
-                        </td>
+                      <td className="max-w-[150px] p-4 text-[#6f6254] break-words">
+                        {row.serial || "-"}
+                      </td>
 
-                        <td className="max-w-[150px] p-4 text-[#6f6254] break-words">
-                          {row.serial || "-"}
-                        </td>
+                      <td className="max-w-[120px] p-4 text-[#6f6254]">
+                        <span className="line-clamp-2"></span>
+                        {row.receiptType || "-"}
+                      </td>
 
-                        <td className="max-w-[120px] p-4 text-[#6f6254]">
-                          <span className="line-clamp-2"></span>
-                          {row.receiptType || "-"}
-                        </td>
+                      <td className="p-4">{row.paperType || "-"}</td>
+                      <td className="w-[80px] min-w-[80px] p-4 whitespace-nowrap">
+                        {row.ply || "-"}
+                      </td>
+                      <td className="p-4">{row.size || "-"}</td>
 
-                        <td className="p-4">{row.paperType || "-"}</td>
-                        <td className="p-4">{row.ply || "-"}</td>
-                        <td className="p-4">{row.size || "-"}</td>
+                      <td className="p-4">
+                        <span
+                          className={`rounded-md px-3 py-1 text-xs font-bold ${
+                            isRush
+                              ? "bg-red-100 text-red-700"
+                              : "bg-green-100 text-green-700"
+                          }`}
+                        >
+                          {row.orderPriority || "Normal"}
+                        </span>
+                      </td>
 
-                        <td className="p-4">
-                          <span
-                            className={`rounded-md px-3 py-1 text-xs font-bold ${
-                              isRush
-                                ? "bg-red-100 text-red-700"
-                                : "bg-green-100 text-green-700"
-                            }`}
-                          >
-                            {row.orderPriority || "Normal"}
-                          </span>
-                        </td>
-
-                        <td className="p-4">
-                          {row.deliveryStrategy === "Partial Release" ? (
-                            <div>
-                              <span className="rounded-md bg-yellow-100 px-3 py-1 text-xs font-bold text-yellow-700">
-                                Partial
-                              </span>
-                              <p className="mt-1 text-xs text-[#6f6254]">
-                                {row.initialReleaseQty || 0} first
-                              </p>
-                            </div>
-                          ) : (
-                            <span className="rounded-md bg-green-100 px-3 py-1 text-xs font-bold text-green-700">
-                              Complete
+                      <td className="p-4">
+                        {row.deliveryStrategy === "Partial Release" ? (
+                          <div>
+                            <span className="rounded-md bg-yellow-100 px-3 py-1 text-xs font-bold text-yellow-700">
+                              Partial
                             </span>
-                          )}
-                        </td>
-
-                        <td className="p-4">
-                          <span className="rounded-md border border-[#e6ddd1] bg-white px-3 py-1 text-xs font-semibold text-[#5f5448]">
-                            {shortStation(row.currentStation)}
-                          </span>
-                        </td>
-
-                        <td className="p-4 text-[#6f6254]">
-                          {row.arrivalDate || "-"}
-                        </td>
-
-                        <td className="p-4 text-[#6f6254]">
-                          {row.processingHours}
-                        </td>
-
-                        <td className="p-4 font-semibold">
-                          {row.deliveryStrategy === "Partial Release" ? (
-                            <div className="space-y-1">
-                              <p>
-                                <span className="text-xs text-[#6f6254]">Initial:</span>{" "}
-                                {row.initialDueDate || "-"}
-                              </p>
-                              <p>
-                                <span className="text-xs text-[#6f6254]">Final:</span>{" "}
-                                {row.finalDueDate || "-"}
-                              </p>
-                            </div>
-                          ) : (
-                            row.finalDueDate || row.currentDueDate || "-"
-                          )}
-                        </td>
-
-                        <td className="p-4">
-                          <div className="space-y-1">
-                            <span
-                              className={`inline-block rounded-md px-3 py-1 text-xs font-bold ${daysBadge.className}`}
-                            >
-                              {daysBadge.text}
-                            </span>
-
-                            {row.deliveryStrategy === "Partial Release" && (
-                              <div className="text-[10px] font-semibold text-[#6f6254]">
-                                {row.initialCommitmentStatus === "Completed"
-                                  ? "Final commitment"
-                                  : "Initial commitment"}
-                              </div>
-                            )}
+                            <p className="mt-1 text-xs text-[#6f6254]">
+                              {row.initialReleaseQty || 0} first
+                            </p>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                        ) : (
+                          <span className="rounded-md bg-green-100 px-3 py-1 text-xs font-bold text-green-700">
+                            Complete
+                          </span>
+                        )}
+                      </td>
 
-        <footer className="mt-8 text-center text-xs text-[#7c6a56]">
-          © 2026 LIC Printing Shop. Production Management System.
-        </footer>
-      </div>
+                      <td className="w-[120px] min-w-[120px] p-4">
+                        <span className="inline-block whitespace-nowrap rounded-md border border-[#e6ddd1] bg-white px-3 py-1 text-xs font-semibold text-[#5f5448]">
+                          {shortStation(row.currentStation)}
+                        </span>
+                      </td>
+
+                      <td className="p-4 text-[#6f6254]">
+                        {row.arrivalDate || "-"}
+                      </td>
+
+                      <td className="p-4 text-[#6f6254]">
+                        {row.processingHours}
+                      </td>
+
+                      <td className="w-[155px] min-w-[155px] p-4 font-semibold">
+                        {row.deliveryStrategy === "Partial Release" ? (
+                          <div className="space-y-1.5">
+                            <div className="grid grid-cols-[42px_1fr] items-center gap-2">
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-[#8a7b6b]">
+                                Initial
+                              </span>
+
+                              <span
+                                className={`whitespace-nowrap text-xs font-bold ${
+                                  row.initialCommitmentStatus === "Completed"
+                                    ? "text-green-700 line-through opacity-70"
+                                    : "text-black"
+                                }`}
+                              >
+                                {row.initialDueDate || "-"}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-[42px_1fr] items-center gap-2">
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-[#8a7b6b]">
+                                Final
+                              </span>
+
+                              <span className="whitespace-nowrap text-xs font-bold text-black">
+                                {row.finalDueDate || "-"}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="whitespace-nowrap">
+                            {row.finalDueDate || row.currentDueDate || "-"}
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="w-[110px] min-w-[110px] p-4">
+                        <div className="space-y-1">
+                          <span
+                            className={`inline-block rounded-md px-3 py-1 text-xs font-bold ${daysBadge.className}`}
+                          >
+                            {daysBadge.text}
+                          </span>
+
+                          {row.deliveryStrategy === "Partial Release" && (
+                            <div className="whitespace-nowrap text-[10px] font-semibold text-[#6f6254]">
+                              {row.initialCommitmentStatus === "Completed"
+                                ? "Until final due"
+                                : "Until initial due"}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer className="mt-8 text-center text-xs text-[#7c6a56]">
+        © 2026 LIC Printing Shop. Production Management System.
+      </footer>
     </AppShell>
   );
 }

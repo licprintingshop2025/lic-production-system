@@ -10,13 +10,13 @@ export async function GET() {
       `https://api.trello.com/1/boards/${boardId}/lists?cards=open&key=${key}&token=${token}`,
       {
         cache: "no-store",
-      }
+      },
     );
 
     if (!response.ok) {
       return NextResponse.json(
         { error: "Failed to fetch lists" },
-        { status: response.status }
+        { status: response.status },
       );
     }
 

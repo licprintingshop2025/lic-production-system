@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 
-async function removePriorityLabels(cardId: string, key: string, token: string) {
+async function removePriorityLabels(
+  cardId: string,
+  key: string,
+  token: string,
+) {
   const res = await fetch(
     `https://api.trello.com/1/cards/${cardId}/labels?key=${key}&token=${token}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
 
   if (!res.ok) return;
@@ -17,7 +21,7 @@ async function removePriorityLabels(cardId: string, key: string, token: string) 
     ) {
       await fetch(
         `https://api.trello.com/1/cards/${cardId}/idLabels/${label.id}?key=${key}&token=${token}`,
-        { method: "DELETE" }
+        { method: "DELETE" },
       );
     }
   }
@@ -27,7 +31,7 @@ async function addPriorityLabel(
   cardId: string,
   priority: string,
   key: string,
-  token: string
+  token: string,
 ) {
   const isRush = priority.toLowerCase() === "rush";
 
@@ -40,13 +44,13 @@ async function addPriorityLabel(
         name: isRush ? "Rush" : "Normal",
         color: isRush ? "red" : "green",
       }),
-    }
+    },
   );
 }
 
 export async function GET(
   req: Request,
-  { params }: { params: Promise<{ cardId: string }> }
+  { params }: { params: Promise<{ cardId: string }> },
 ) {
   const { cardId } = await params;
 
@@ -56,13 +60,13 @@ export async function GET(
   if (!key || !token) {
     return NextResponse.json(
       { error: "Missing Trello credentials" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
   const res = await fetch(
     `https://api.trello.com/1/cards/${cardId}?fields=name,desc,due,idList,url,labels&key=${key}&token=${token}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
 
   if (!res.ok) {
@@ -76,7 +80,7 @@ export async function GET(
 
 export async function PUT(
   req: Request,
-  { params }: { params: Promise<{ cardId: string }> }
+  { params }: { params: Promise<{ cardId: string }> },
 ) {
   const { cardId } = await params;
 
@@ -87,7 +91,7 @@ export async function PUT(
   if (!key || !token) {
     return NextResponse.json(
       { error: "Missing Trello credentials" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
@@ -107,7 +111,7 @@ export async function PUT(
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updateBody),
-    }
+    },
   );
 
   if (!res.ok) {
@@ -115,7 +119,7 @@ export async function PUT(
 
     return NextResponse.json(
       { error: "Failed to update card", details: errorText },
-      { status: 500 }
+      { status: 500 },
     );
   }
 

@@ -116,7 +116,7 @@ export default async function ProductionJobPage({ params }: Props) {
         birRow[1],
         birRow[0],
         parsed["TRACKING NUMBER"],
-        parsed["TRACKING"]
+        parsed["TRACKING"],
       );
 
   const dateAtp = isNonBir ? "-" : prefer(birRow[2], birRow[1]);
@@ -134,7 +134,7 @@ export default async function ProductionJobPage({ params }: Props) {
         birRow[5],
         parsed["TRADE NAME"],
         parsed["BUSINESS"],
-        parsed["BUSINESS NAME"]
+        parsed["BUSINESS NAME"],
       );
 
   const registeredAddress = isNonBir
@@ -158,7 +158,12 @@ export default async function ProductionJobPage({ params }: Props) {
     : prefer(birRow[11], birRow[10], parsed["TAX TYPE"]);
 
   const quantity = isNonBir
-    ? prefer(nonBirRow[4], parsed["QTY"], parsed["QUANTITY"], parsed["BOOKLETS"])
+    ? prefer(
+        nonBirRow[4],
+        parsed["QTY"],
+        parsed["QUANTITY"],
+        parsed["BOOKLETS"],
+      )
     : prefer(birRow[12], birRow[11], parsed["QTY"], parsed["QUANTITY"]);
 
   const sets = isNonBir ? "-" : prefer(birRow[13], birRow[12], parsed["SETS"]);
@@ -173,7 +178,7 @@ export default async function ProductionJobPage({ params }: Props) {
         birRow[15],
         birRow[14],
         parsed["SERIAL"],
-        parsed["SERIAL NUMBERS"]
+        parsed["SERIAL NUMBERS"],
       );
 
   const atpReceived = isNonBir
@@ -190,7 +195,7 @@ export default async function ProductionJobPage({ params }: Props) {
     parsed["PLY"],
     parsed["NO. OF PLY"],
     parsed["NO OF PLY"],
-    birRow[20]
+    birRow[20],
   );
 
   const size = prefer(parsed["SIZE"], parsed["PAPER SIZE"], birRow[21]);
@@ -199,7 +204,7 @@ export default async function ProductionJobPage({ params }: Props) {
     parsed["PRIORITY"],
     parsed["ORDER PRIORITY"],
     birRow[22],
-    "Normal"
+    "Normal",
   );
 
   const specialInstructions = prefer(
@@ -207,106 +212,102 @@ export default async function ProductionJobPage({ params }: Props) {
     parsed["SPECIAL INSTRUCTIONS"],
     parsed["INSTRUCTIONS"],
     parsed["REMARKS"],
-    birRow[23]
+    birRow[23],
   );
 
   const detailsComplete =
     !!productionRecord || card.desc?.includes("COMPLETED PRODUCTION DETAILS");
 
   return (
-    <AppShell activePage="production">
-      <div className="mx-auto max-w-[1200px]">
+    <AppShell activePage="production" contentWidth="standard">
+      <section className="rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+          <div>
+            <p className="text-xs font-black uppercase tracking-widest text-[#8b5e24]">
+              Job Card
+            </p>
+
+            <h1 className="mt-3 text-3xl font-black text-black">{card.name}</h1>
+
+            <p className="mt-2 text-sm text-[#6f6254]">
+              Trello Card ID: {card.id}
+            </p>
+          </div>
+
+          <span className="rounded-lg bg-[#f8ead3] px-4 py-2 text-sm font-black text-[#8b5e24]">
+            Done Checklist: Open
+          </span>
+        </div>
+      </section>
+
+      <section className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-4">
+        <InfoCard title="Tracking No." value={trackingNo} />
+        <InfoCard title="Tax Type" value={taxType} />
+        <InfoCard title="Priority" value={priority} />
+        <InfoCard
+          title="Status"
+          value={detailsComplete ? "Details Complete" : "Pending Details"}
+          green={detailsComplete}
+        />
+      </section>
+
+      <section className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
         <section className="rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
-          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-            <div>
-              <p className="text-xs font-black uppercase tracking-widest text-[#8b5e24]">
-                Job Card
-              </p>
+          <SectionHeader
+            number="01"
+            title="Business Information"
+            description={
+              isNonBir
+                ? "Non-BIR order details."
+                : "Taxpayer and registered business details."
+            }
+          />
 
-              <h1 className="mt-3 text-3xl font-black text-black">
-                {card.name}
-              </h1>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <Detail label="Date of ATP" value={dateAtp} />
+            <Detail label="Business / Trade Name" value={businessName} />
+            <Detail label="Taxpayer" value={taxpayer} />
+            <Detail label="TIN" value={tin} />
+            <Detail label="OCN" value={ocn} />
+            <Detail label="RDO Code" value={rdoCode} />
+            <Detail label="Sales Assigned" value={salesAssigned} />
 
-              <p className="mt-2 text-sm text-[#6f6254]">
-                Trello Card ID: {card.id}
-              </p>
+            <div className="md:col-span-2">
+              <Detail label="Registered Address" value={registeredAddress} />
             </div>
-
-            <span className="rounded-lg bg-[#f8ead3] px-4 py-2 text-sm font-black text-[#8b5e24]">
-              Done Checklist: Open
-            </span>
           </div>
         </section>
 
-        <section className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-4">
-          <InfoCard title="Tracking No." value={trackingNo} />
-          <InfoCard title="Tax Type" value={taxType} />
-          <InfoCard title="Priority" value={priority} />
-          <InfoCard
-            title="Status"
-            value={detailsComplete ? "Details Complete" : "Pending Details"}
-            green={detailsComplete}
+        <section className="rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
+          <SectionHeader
+            number="02"
+            title="Printing Details"
+            description="Booklet, serial, ATP, and print specifications."
           />
-        </section>
 
-        <section className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
-          <section className="rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
-            <SectionHeader
-              number="01"
-              title="Business Information"
-              description={
-                isNonBir
-                  ? "Non-BIR order details."
-                  : "Taxpayer and registered business details."
-              }
-            />
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <Detail label="Manner" value={manner} />
+            <Detail label="ATP" value={atpReceived} />
+            <Detail label="Quantity" value={quantity} />
+            <Detail label="Sets" value={sets} />
+            <Detail label="Copies" value={copies} />
+            <Detail label="Serial Numbers" value={serialNumbers} />
+            <Detail label="Document" value={documentType} />
+            <Detail label="Paper" value={paper} />
+            <Detail label="Ply" value={ply} />
+            <Detail label="Size" value={size} />
 
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              <Detail label="Date of ATP" value={dateAtp} />
-              <Detail label="Business / Trade Name" value={businessName} />
-              <Detail label="Taxpayer" value={taxpayer} />
-              <Detail label="TIN" value={tin} />
-              <Detail label="OCN" value={ocn} />
-              <Detail label="RDO Code" value={rdoCode} />
-              <Detail label="Sales Assigned" value={salesAssigned} />
-
-              <div className="md:col-span-2">
-                <Detail label="Registered Address" value={registeredAddress} />
-              </div>
+            <div className="md:col-span-2">
+              <Detail
+                label="Special Instructions"
+                value={specialInstructions}
+              />
             </div>
-          </section>
-
-          <section className="rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
-            <SectionHeader
-              number="02"
-              title="Printing Details"
-              description="Booklet, serial, ATP, and print specifications."
-            />
-
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              <Detail label="Manner" value={manner} />
-              <Detail label="ATP" value={atpReceived} />
-              <Detail label="Quantity" value={quantity} />
-              <Detail label="Sets" value={sets} />
-              <Detail label="Copies" value={copies} />
-              <Detail label="Serial Numbers" value={serialNumbers} />
-              <Detail label="Document" value={documentType} />
-              <Detail label="Paper" value={paper} />
-              <Detail label="Ply" value={ply} />
-              <Detail label="Size" value={size} />
-
-              <div className="md:col-span-2">
-                <Detail
-                  label="Special Instructions"
-                  value={specialInstructions}
-                />
-              </div>
-            </div>
-          </section>
+          </div>
         </section>
+      </section>
 
-        <BottomActions trelloUrl={card.url} />
-      </div>
+      <BottomActions trelloUrl={card.url} />
     </AppShell>
   );
 }
@@ -351,9 +352,7 @@ function InfoCard({
 
       <p
         className={`mt-3 inline-block rounded-lg px-3 py-2 text-sm font-black ${
-          green
-            ? "bg-green-100 text-green-700"
-            : "bg-[#f8ead3] text-[#8b5e24]"
+          green ? "bg-green-100 text-green-700" : "bg-[#f8ead3] text-[#8b5e24]"
         }`}
       >
         {value}

@@ -29,7 +29,7 @@ export default function NonBIROrdersPage() {
   const [savedTrackingNo, setSavedTrackingNo] = useState("");
 
   function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) {
     setFormData({
       ...formData,
@@ -40,12 +40,12 @@ export default function NonBIROrdersPage() {
   function handleDocumentChange(
     id: string,
     field: keyof DocumentItem,
-    value: string
+    value: string,
   ) {
     setFormData((current) => ({
       ...current,
       documents: current.documents.map((doc) =>
-        doc.id === id ? { ...doc, [field]: value } : doc
+        doc.id === id ? { ...doc, [field]: value } : doc,
       ),
     }));
   }
@@ -69,7 +69,7 @@ export default function NonBIROrdersPage() {
 
   function joinDocuments(
     field: keyof DocumentItem,
-    fallbackField?: keyof DocumentItem
+    fallbackField?: keyof DocumentItem,
   ) {
     return formData.documents
       .map((doc) => {
@@ -128,122 +128,122 @@ export default function NonBIROrdersPage() {
   }
 
   return (
-    <AppShell activePage="non-bir-orders">
-      <div className="mx-auto max-w-[1200px]">
-        <PageHeader
-          title="Non-BIR Orders"
-          description="Encode Non-BIR orders using LIC's current production record format and automatically create a Trello card."
-        />
+    <AppShell activePage="non-bir-orders" contentWidth="form">
+      <PageHeader
+        title="Non-BIR Orders"
+        description="Encode Non-BIR orders using LIC's current production record format and automatically create a Trello card."
+      />
 
-        {savedTrackingNo && (
-          <section className="mt-7 rounded-xl border border-green-200 bg-green-50 p-6 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-widest text-green-700">
-              Record Saved
-            </p>
-            <h2 className="mt-2 text-2xl font-black text-black">
-              Tracking Number Generated
-            </h2>
-            <p className="mt-3 rounded-lg border border-green-200 bg-white p-4 font-mono text-lg font-bold text-green-700">
-              {savedTrackingNo}
-            </p>
-          </section>
-        )}
+      {savedTrackingNo && (
+        <section className="mt-7 rounded-xl border border-green-200 bg-green-50 p-6 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-widest text-green-700">
+            Record Saved
+          </p>
+          <h2 className="mt-2 text-2xl font-black text-black">
+            Tracking Number Generated
+          </h2>
+          <p className="mt-3 rounded-lg border border-green-200 bg-white p-4 font-mono text-lg font-bold text-green-700">
+            {savedTrackingNo}
+          </p>
+        </section>
+      )}
 
-        <form onSubmit={handleSubmit} className="mt-7 space-y-5">
-          <section className="rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-black">
-              Client / Order Information
-            </h2>
+      <form onSubmit={handleSubmit} className="mt-7 space-y-5">
+        <section className="rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-black">
+            Client / Order Information
+          </h2>
 
-            <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
-              <Input
-                label="Date Received"
-                name="dateReceived"
-                type="date"
-                value={formData.dateReceived}
-                onChange={handleChange}
-                required
+          <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+            <Input
+              label="Date Received"
+              name="dateReceived"
+              type="date"
+              value={formData.dateReceived}
+              onChange={handleChange}
+              required
+            />
+
+            <Input
+              label="Business / Trade Name"
+              name="businessName"
+              value={formData.businessName}
+              onChange={handleChange}
+              required
+            />
+
+            <Input
+              label="Sales Assigned"
+              name="salesAssigned"
+              value={formData.salesAssigned}
+              onChange={handleChange}
+              required
+            />
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-black">Documents Included</h2>
+          <p className="mt-1 text-sm text-[#6f6254]">
+            Add one or more Non-BIR document orders under the same tracking
+            number.
+          </p>
+
+          <div className="mt-6 space-y-5">
+            {formData.documents.map((document, index) => (
+              <DocumentItemCard
+                key={document.id}
+                document={document}
+                index={index}
+                canRemove={formData.documents.length > 1}
+                mode="non-bir"
+                onChange={handleDocumentChange}
+                onRemove={handleRemoveDocument}
               />
+            ))}
 
-              <Input
-                label="Business / Trade Name"
-                name="businessName"
-                value={formData.businessName}
-                onChange={handleChange}
-                required
-              />
+            <button
+              type="button"
+              onClick={handleAddDocument}
+              className="rounded-xl border border-[#d6b46a] bg-white px-5 py-3 text-sm font-black text-[#8b5e24] hover:bg-[#fff7e6]"
+            >
+              + Add Another Document
+            </button>
+          </div>
+        </section>
 
-              <Input
-                label="Sales Assigned"
-                name="salesAssigned"
-                value={formData.salesAssigned}
-                onChange={handleChange}
-                required
-              />
-            </div>
-          </section>
-
-          <section className="rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-black">Documents Included</h2>
-            <p className="mt-1 text-sm text-[#6f6254]">
-              Add one or more Non-BIR document orders under the same tracking number.
+        <div className="mt-8 border-t border-[#e6ddd1] bg-[#fffaf2] px-6 py-5 lg:px-8">
+          <div className="mx-auto flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-[#6f6254]">
+              Saving this form will add a Non-BIR record to Google Sheets and
+              create a Trello card.
             </p>
 
-            <div className="mt-6 space-y-5">
-              {formData.documents.map((document, index) => (
-                <DocumentItemCard
-                  key={document.id}
-                  document={document}
-                  index={index}
-                  canRemove={formData.documents.length > 1}
-                  mode="non-bir"
-                  onChange={handleDocumentChange}
-                  onRemove={handleRemoveDocument}
-                />
-              ))}
-
+            <div className="flex shrink-0 justify-end gap-3">
               <button
                 type="button"
-                onClick={handleAddDocument}
-                className="rounded-xl border border-[#d6b46a] bg-white px-5 py-3 text-sm font-black text-[#8b5e24] hover:bg-[#fff7e6]"
+                onClick={handleReset}
+                disabled={saving}
+                className="rounded-lg border border-[#e6ddd1] bg-white px-6 py-3 text-sm font-bold text-black transition hover:bg-[#fbf7ef] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                + Add Another Document
+                Clear Form
+              </button>
+
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-lg bg-[#e1bb5f] px-8 py-3 text-sm font-black text-black transition hover:bg-[#edca73] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving ? "Saving..." : "Save Non-BIR Order"}
               </button>
             </div>
-          </section>
-
-          <div className="sticky bottom-0 z-20 -mx-6 border-t border-[#e6ddd1] bg-[#fffaf2]/95 px-6 py-5 backdrop-blur lg:-mx-8 lg:px-8">
-            <div className="mx-auto flex max-w-[1200px] flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <p className="text-xs text-[#6f6254]">
-                Saving this form will add a Non-BIR record to Google Sheets and
-                create a Trello card.
-              </p>
-
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="rounded-lg border border-[#e6ddd1] bg-white px-6 py-3 text-sm font-bold text-black hover:bg-[#fbf7ef]"
-                >
-                  Clear Form
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="rounded-lg bg-[#e1bb5f] px-8 py-3 text-sm font-black text-black hover:bg-[#edca73] disabled:opacity-60"
-                >
-                  {saving ? "Saving..." : "Save Non-BIR Order"}
-                </button>
-              </div>
-            </div>
           </div>
-        </form>
+        </div>
+      </form>
 
-        <footer className="mt-8 text-center text-xs text-[#7c6a56]">
-          © 2026 LIC Printing Shop. Production Management System.
-        </footer>
-      </div>
+      <footer className="mt-8 text-center text-xs text-[#7c6a56]">
+        © 2026 LIC Printing Shop. Production Management System.
+      </footer>
     </AppShell>
   );
 }

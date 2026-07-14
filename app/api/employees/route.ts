@@ -46,7 +46,7 @@ export async function GET() {
         error:
           error instanceof Error ? error.message : "Failed to load employees",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
     if (!body.employeeId || !body.name) {
       return NextResponse.json(
         { error: "Employee ID and name are required." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
         error:
           error instanceof Error ? error.message : "Failed to create employee.",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

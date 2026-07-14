@@ -1,9 +1,5 @@
 import type { DocumentItem, NonBIROrder, ReceivedATPOrder } from "./types";
-import {
-  buildOrderType,
-  clean,
-  formatDateForTitle,
-} from "./utils";
+import { buildOrderType, clean, formatDateForTitle } from "./utils";
 
 export function buildReceivedATPDocumentSection(documents: DocumentItem[]) {
   if (documents.length === 0) return "-";

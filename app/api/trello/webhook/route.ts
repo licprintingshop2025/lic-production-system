@@ -17,10 +17,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const actionType = body.action?.type;
 
-    const allowedActions = [
-      "updateCard",
-      "updateCheckItemStateOnCard",
-    ];
+    const allowedActions = ["updateCard", "updateCheckItemStateOnCard"];
 
     if (!allowedActions.includes(actionType)) {
       return NextResponse.json({
@@ -57,7 +54,7 @@ export async function POST(req: Request) {
         success: false,
         error: error instanceof Error ? error.message : "Webhook error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

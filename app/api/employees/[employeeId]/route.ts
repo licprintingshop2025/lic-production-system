@@ -3,7 +3,7 @@ import { updateEmployee } from "@/lib/googleSheets";
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ employeeId: string }> }
+  { params }: { params: Promise<{ employeeId: string }> },
 ) {
   try {
     const { employeeId } = await params;
@@ -37,11 +37,9 @@ export async function PUT(
       {
         success: false,
         error:
-          error instanceof Error
-            ? error.message
-            : "Unable to update employee",
+          error instanceof Error ? error.message : "Unable to update employee",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

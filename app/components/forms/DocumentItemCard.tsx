@@ -45,9 +45,7 @@ export default function DocumentItemCard({
   return (
     <div className="rounded-2xl border border-[#e3d8c7] bg-[#fffaf2] p-5">
       <div className="mb-5 flex items-center justify-between">
-        <h3 className="text-lg font-black text-black">
-          Document #{index + 1}
-        </h3>
+        <h3 className="text-lg font-black text-black">Document #{index + 1}</h3>
 
         {canRemove && (
           <button
@@ -102,9 +100,7 @@ export default function DocumentItemCard({
           <Select
             label="No. of Sets Per Booklet"
             value={document.setsPerBooklet || "50"}
-            onChange={(value) =>
-              onChange(document.id, "setsPerBooklet", value)
-            }
+            onChange={(value) => onChange(document.id, "setsPerBooklet", value)}
             required
             options={SETS_PER_BOOKLET_OPTIONS}
           />
@@ -140,7 +136,6 @@ export default function DocumentItemCard({
           required
         />
       </div>
-
     </div>
   );
 }

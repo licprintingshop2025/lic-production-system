@@ -47,7 +47,7 @@ export default function ReceivedATPPage() {
   function handleChange(
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) {
     setFormData({
       ...formData,
@@ -58,12 +58,12 @@ export default function ReceivedATPPage() {
   function handleDocumentChange(
     id: string,
     field: keyof DocumentItem,
-    value: string
+    value: string,
   ) {
     setFormData((current) => ({
       ...current,
       documents: current.documents.map((doc) =>
-        doc.id === id ? { ...doc, [field]: value } : doc
+        doc.id === id ? { ...doc, [field]: value } : doc,
       ),
     }));
   }
@@ -87,7 +87,7 @@ export default function ReceivedATPPage() {
 
   function joinDocuments(
     field: keyof DocumentItem,
-    fallbackField?: keyof DocumentItem
+    fallbackField?: keyof DocumentItem,
   ) {
     return formData.documents
       .map((doc) => {
@@ -139,209 +139,208 @@ export default function ReceivedATPPage() {
   }
 
   return (
-    <AppShell activePage="received-atp">
-      <div className="mx-auto max-w-[1400px]">
-        <PageHeader
-          title="Received ATP Intake"
-          description="Encode received ATP records and automatically create a Trello job card using LIC's production workflow format."
-        />
+    <AppShell activePage="received-atp" contentWidth="form">
+      <PageHeader
+        title="Received ATP Intake"
+        description="Encode received ATP records and automatically create a Trello job card using LIC's production workflow format."
+      />
 
-        {savedTrackingNo && (
-          <section className="mt-8 rounded-2xl border border-green-200 bg-green-50 p-6 shadow-[0_2px_10px_rgba(70,45,20,0.08)]">
-            <p className="text-xs font-bold uppercase tracking-[0.25em] text-green-700">
-              Record Saved
-            </p>
-            <h2 className="mt-2 text-2xl font-black text-black">
-              Tracking Number Generated
-            </h2>
-            <p className="mt-3 rounded-xl border border-green-200 bg-white p-4 font-mono text-lg font-bold text-green-700">
-              {savedTrackingNo}
-            </p>
-          </section>
-        )}
+      {savedTrackingNo && (
+        <section className="mt-8 rounded-2xl border border-green-200 bg-green-50 p-6 shadow-[0_2px_10px_rgba(70,45,20,0.08)]">
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-green-700">
+            Record Saved
+          </p>
+          <h2 className="mt-2 text-2xl font-black text-black">
+            Tracking Number Generated
+          </h2>
+          <p className="mt-3 rounded-xl border border-green-200 bg-white p-4 font-mono text-lg font-bold text-green-700">
+            {savedTrackingNo}
+          </p>
+        </section>
+      )}
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-          <FormSection
-            number="01"
-            title="Taxpayer Information"
-            description="Basic taxpayer and registered business details."
-          >
-            <Input
-              label="Date of ATP"
-              name="dateOfAtp"
-              type="date"
-              value={formData.dateOfAtp}
+      <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+        <FormSection
+          number="01"
+          title="Taxpayer Information"
+          description="Basic taxpayer and registered business details."
+        >
+          <Input
+            label="Date of ATP"
+            name="dateOfAtp"
+            type="date"
+            value={formData.dateOfAtp}
+            onChange={handleChange}
+            required
+          />
+
+          <Input
+            label="OCN"
+            name="ocn"
+            value={formData.ocn}
+            onChange={handleChange}
+            required
+          />
+
+          <Input
+            label="TIN"
+            name="tin"
+            value={formData.tin}
+            onChange={handleChange}
+            required
+          />
+
+          <Input
+            label="Taxpayer Name"
+            name="taxpayerName"
+            value={formData.taxpayerName}
+            onChange={handleChange}
+            required
+          />
+
+          <Input
+            label="Business / Trade Name"
+            name="businessName"
+            value={formData.businessName}
+            onChange={handleChange}
+            required
+          />
+
+          <Input
+            label="RDO Code"
+            name="rdoCode"
+            value={formData.rdoCode}
+            onChange={handleChange}
+            required
+          />
+
+          <div className="md:col-span-2">
+            <Textarea
+              label="Registered Address"
+              name="registeredAddress"
+              value={formData.registeredAddress}
               onChange={handleChange}
               required
             />
+          </div>
+        </FormSection>
 
-            <Input
-              label="OCN"
-              name="ocn"
-              value={formData.ocn}
-              onChange={handleChange}
-              required
-            />
+        <FormSection
+          number="02"
+          title="Documents Included"
+          description="Add one or more invoice or receipt documents under the same ATP order."
+        >
+          <Select
+            label="Tax Type"
+            name="taxType"
+            value={formData.taxType}
+            onChange={handleChange}
+            required
+            options={["VAT", "NON-VAT"]}
+          />
 
-            <Input
-              label="TIN"
-              name="tin"
-              value={formData.tin}
-              onChange={handleChange}
-              required
-            />
-
-            <Input
-              label="Taxpayer Name"
-              name="taxpayerName"
-              value={formData.taxpayerName}
-              onChange={handleChange}
-              required
-            />
-
-            <Input
-              label="Business / Trade Name"
-              name="businessName"
-              value={formData.businessName}
-              onChange={handleChange}
-              required
-            />
-
-            <Input
-              label="RDO Code"
-              name="rdoCode"
-              value={formData.rdoCode}
-              onChange={handleChange}
-              required
-            />
-
-            <div className="md:col-span-2">
-              <Textarea
-                label="Registered Address"
-                name="registeredAddress"
-                value={formData.registeredAddress}
-                onChange={handleChange}
-                required
+          <div className="md:col-span-2 space-y-5">
+            {formData.documents.map((document, index) => (
+              <DocumentItemCard
+                key={document.id}
+                document={document}
+                index={index}
+                canRemove={formData.documents.length > 1}
+                mode="received-atp"
+                onChange={handleDocumentChange}
+                onRemove={handleRemoveDocument}
               />
-            </div>
-          </FormSection>
+            ))}
 
-          <FormSection
-            number="02"
-            title="Documents Included"
-            description="Add one or more invoice or receipt documents under the same ATP order."
-          >
-            <Select
-              label="Tax Type"
-              name="taxType"
-              value={formData.taxType}
+            <button
+              type="button"
+              onClick={handleAddDocument}
+              className="rounded-xl border border-[#d6b46a] bg-white px-5 py-3 text-sm font-black text-[#8b5e24] hover:bg-[#fff7e6]"
+            >
+              + Add Another Document
+            </button>
+          </div>
+        </FormSection>
+
+        <FormSection
+          number="03"
+          title="ATP Received & Staff Assignment"
+          description="Record ATP source and assigned sales/staff name."
+        >
+          <Select
+            label="ATP Received"
+            name="atpReceived"
+            value={formData.atpReceived}
+            onChange={handleChange}
+            required
+            options={["ORIGINAL", "PHOTOCOPY", "ORUS ATP"]}
+          />
+
+          <Select
+            label="Sales Assigned"
+            name="salesAssigned"
+            value={formData.salesAssigned}
+            onChange={handleChange}
+            required
+            options={[
+              "JARYLL",
+              "ANGELICA",
+              "RUBY",
+              "LANIE",
+              "MARK",
+              "SHANE",
+              "ALGEAN",
+              "AI",
+              "DENNIS",
+              "LIC NEW CUSTOMER",
+              "LIC REPEAT CUSTOMER",
+              "OTHERS",
+            ]}
+          />
+
+          {formData.salesAssigned === "OTHERS" && (
+            <Input
+              label="Specify Sales Assigned"
+              name="salesAssignedOther"
+              value={formData.salesAssignedOther}
               onChange={handleChange}
               required
-              options={["VAT", "NON-VAT"]}
             />
+          )}
+        </FormSection>
 
-            <div className="md:col-span-2 space-y-5">
-              {formData.documents.map((document, index) => (
-                <DocumentItemCard
-                  key={document.id}
-                  document={document}
-                  index={index}
-                  canRemove={formData.documents.length > 1}
-                  mode="received-atp"
-                  onChange={handleDocumentChange}
-                  onRemove={handleRemoveDocument}
-                />
-              ))}
+        <div className="mt-8 border-t border-[#e3d8c7] bg-[#fffaf2] px-6 py-5 lg:px-8">
+          <div className="mx-auto flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-[#7c6a56]">
+              Saving this form will create a Trello ATP intake card. Production
+              details will be completed in the next workflow step.
+            </p>
 
+            <div className="flex shrink-0 justify-end gap-3">
               <button
                 type="button"
-                onClick={handleAddDocument}
-                className="rounded-xl border border-[#d6b46a] bg-white px-5 py-3 text-sm font-black text-[#8b5e24] hover:bg-[#fff7e6]"
+                onClick={handleReset}
+                disabled={saving}
+                className="rounded-xl border border-[#dfd4c4] bg-white px-6 py-3 text-sm font-bold text-[#3f352a] transition hover:bg-[#fbf7ef] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                + Add Another Document
+                Clear Form
+              </button>
+
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-xl bg-[#e1bb5f] px-8 py-3 text-sm font-black text-black transition hover:bg-[#edca73] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving ? "Saving..." : "Save ATP Record"}
               </button>
             </div>
-          </FormSection>
-
-          <FormSection
-            number="03"
-            title="ATP Received & Staff Assignment"
-            description="Record ATP source and assigned sales/staff name."
-          >
-            <Select
-              label="ATP Received"
-              name="atpReceived"
-              value={formData.atpReceived}
-              onChange={handleChange}
-              required
-              options={["ORIGINAL", "PHOTOCOPY", "ORUS ATP"]}
-            />
-
-            <Select
-              label="Sales Assigned"
-              name="salesAssigned"
-              value={formData.salesAssigned}
-              onChange={handleChange}
-              required
-              options={[
-                "JARYLL",
-                "ANGELICA",
-                "RUBY",
-                "LANIE",
-                "MARK",
-                "SHANE",
-                "ALGEAN",
-                "AI",
-                "DENNIS",
-                "LIC NEW CUSTOMER",
-                "LIC REPEAT CUSTOMER",
-                "OTHERS",
-              ]}
-            />
-
-            {formData.salesAssigned === "OTHERS" && (
-              <Input
-                label="Specify Sales Assigned"
-                name="salesAssignedOther"
-                value={formData.salesAssignedOther}
-                onChange={handleChange}
-                required
-              />
-            )}
-          </FormSection>
-
-          <div className="sticky bottom-0 z-20 -mx-6 border-t border-[#e3d8c7] bg-[#fffaf2]/95 px-6 py-5 backdrop-blur lg:-mx-8 lg:px-8">
-            <div className="mx-auto flex max-w-[1400px] flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <p className="text-xs text-[#7c6a56]">
-                Saving this form will create a Trello ATP intake card.
-                Production details will be completed in the next workflow step.
-              </p>
-
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="rounded-xl border border-[#dfd4c4] bg-white px-6 py-3 text-sm font-bold text-[#3f352a] hover:bg-[#fbf7ef]"
-                >
-                  Clear Form
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="rounded-xl bg-[#e1bb5f] px-8 py-3 text-sm font-black text-black hover:bg-[#edca73] disabled:opacity-60"
-                >
-                  {saving ? "Saving..." : "Save ATP Record"}
-                </button>
-              </div>
-            </div>
           </div>
-        </form>
+        </div>
+      </form>
 
-        <footer className="mt-10 text-center text-xs text-[#7c6a56]">
-          © 2026 LIC Printing Shop. Production Management System.
-        </footer>
-      </div>
+      <footer className="mt-10 text-center text-xs text-[#7c6a56]">
+        © 2026 LIC Printing Shop. Production Management System.
+      </footer>
     </AppShell>
   );
 }

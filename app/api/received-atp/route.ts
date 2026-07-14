@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     if (!key || !token || !listId) {
       return NextResponse.json(
         { error: "Missing Trello environment variables" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     if (documents.length === 0) {
       return NextResponse.json(
         { error: "Please add at least one document." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
           desc: description,
           pos: "top",
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json(
         { error: "Failed to create Trello card", details: errorText },
-        { status: response.status }
+        { status: response.status },
       );
     }
 
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
           details:
             sheetError instanceof Error ? sheetError.message : "Unknown error",
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -96,7 +96,7 @@ export async function POST(req: Request) {
         error: "Server error while creating ATP record",
         details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -71,7 +71,7 @@ function formatDateOnly(date: Date) {
 async function getCardMoveActions(cardId: string, key: string, token: string) {
   const res = await fetch(
     `https://api.trello.com/1/cards/${cardId}/actions?filter=updateCard:idList&key=${key}&token=${token}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
 
   if (!res.ok) return [];
@@ -81,13 +81,13 @@ async function getCardMoveActions(cardId: string, key: string, token: string) {
 
 function findFirstMoveInto(actions: TrelloAction[], listName: string) {
   const sorted = [...actions].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
   );
 
   const action = sorted.find(
     (item) =>
       item.data.listAfter?.name?.trim().toUpperCase() ===
-      listName.trim().toUpperCase()
+      listName.trim().toUpperCase(),
   );
 
   return action?.date || "";
@@ -111,7 +111,7 @@ async function getOrCreatePriorityLabel(
   key: string,
   token: string,
   boardId: string,
-  priority: string
+  priority: string,
 ) {
   const isRush = priority.toLowerCase() === "rush";
   const labelName = isRush ? "Rush" : "Normal";
@@ -119,13 +119,13 @@ async function getOrCreatePriorityLabel(
 
   const labelsRes = await fetch(
     `https://api.trello.com/1/boards/${boardId}/labels?key=${key}&token=${token}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
 
   const labels = (await labelsRes.json()) as TrelloLabel[];
 
   const existingLabel = labels.find(
-    (label) => label.name?.toLowerCase() === labelName.toLowerCase()
+    (label) => label.name?.toLowerCase() === labelName.toLowerCase(),
   );
 
   if (existingLabel) return existingLabel.id;
@@ -140,7 +140,7 @@ async function getOrCreatePriorityLabel(
         color: labelColor,
         idBoard: boardId,
       }),
-    }
+    },
   );
 
   const newLabel = await createRes.json();
@@ -150,11 +150,11 @@ async function getOrCreatePriorityLabel(
 async function removeOldPriorityLabels(
   cardId: string,
   key: string,
-  token: string
+  token: string,
 ) {
   const res = await fetch(
     `https://api.trello.com/1/cards/${cardId}/labels?key=${key}&token=${token}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
 
   if (!res.ok) return;
@@ -168,7 +168,7 @@ async function removeOldPriorityLabels(
     ) {
       await fetch(
         `https://api.trello.com/1/cards/${cardId}/idLabels/${label.id}?key=${key}&token=${token}`,
-        { method: "DELETE" }
+        { method: "DELETE" },
       );
     }
   }
@@ -177,7 +177,7 @@ async function removeOldPriorityLabels(
 async function resetChecklist(cardId: string, key: string, token: string) {
   const checklistsRes = await fetch(
     `https://api.trello.com/1/cards/${cardId}/checklists?key=${key}&token=${token}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
 
   const checklists = await checklistsRes.json();
@@ -185,7 +185,7 @@ async function resetChecklist(cardId: string, key: string, token: string) {
   for (const checklist of checklists) {
     await fetch(
       `https://api.trello.com/1/checklists/${checklist.id}?key=${key}&token=${token}`,
-      { method: "DELETE" }
+      { method: "DELETE" },
     );
   }
 
@@ -195,7 +195,7 @@ async function resetChecklist(cardId: string, key: string, token: string) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "Status" }),
-    }
+    },
   );
 
   const checklist = await newChecklistRes.json();
@@ -206,7 +206,7 @@ async function resetChecklist(cardId: string, key: string, token: string) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "Done" }),
-    }
+    },
   );
 }
 
@@ -223,19 +223,19 @@ export async function PUT(req: Request, context: RouteContext) {
     if (!key || !token || !boardId || !station4ListId) {
       return NextResponse.json(
         { error: "Missing Trello environment variables." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     const getCardRes = await fetch(
       `https://api.trello.com/1/cards/${cardId}?fields=name,desc&key=${key}&token=${token}`,
-      { cache: "no-store" }
+      { cache: "no-store" },
     );
 
     if (!getCardRes.ok) {
       return NextResponse.json(
         { error: "Card not found.", details: await getCardRes.text() },
-        { status: getCardRes.status }
+        { status: getCardRes.status },
       );
     }
 
@@ -249,8 +249,12 @@ export async function PUT(req: Request, context: RouteContext) {
 
     const isNonBir =
       !!nonBirRecord ||
-      String(card.name || "").toUpperCase().includes("NON-BIR") ||
-      String(card.name || "").toUpperCase().includes("NON BIR");
+      String(card.name || "")
+        .toUpperCase()
+        .includes("NON-BIR") ||
+      String(card.name || "")
+        .toUpperCase()
+        .includes("NON BIR");
 
     const trackingNo = isNonBir ? value(nonBirRow[0]) : value(birRow[1]);
     const tradeName = isNonBir ? value(nonBirRow[2]) : value(birRow[6]);
@@ -264,7 +268,10 @@ export async function PUT(req: Request, context: RouteContext) {
     const serial = isNonBir ? value(nonBirRow[5]) : value(birRow[15]);
     const actions = await getCardMoveActions(cardId, key, token);
 
-    const productionStartRaw = findFirstMoveInto(actions, PRODUCTION_START_LIST);
+    const productionStartRaw = findFirstMoveInto(
+      actions,
+      PRODUCTION_START_LIST,
+    );
 
     const hasProductionStarted = Boolean(productionStartRaw);
 
@@ -278,11 +285,10 @@ export async function PUT(req: Request, context: RouteContext) {
 
     const initialDueWorkingDays = toPositiveNumber(
       body.initialDueWorkingDays,
-      10
+      10,
     );
 
-    const isRush =
-      body.orderPriority?.trim().toLowerCase() === "rush";
+    const isRush = body.orderPriority?.trim().toLowerCase() === "rush";
 
     const finalDueWorkingDays =
       deliveryStrategy === "PARTIAL"
@@ -323,18 +329,20 @@ PRIORITY: ${body.orderPriority}
 
 DELIVERY COMMITMENT:
 DELIVERY STRATEGY: ${getDeliveryLabel(deliveryStrategy)}
-INITIAL RELEASE QTY: ${deliveryStrategy === "PARTIAL" ? `${initialReleaseQty} Booklets` : "-"
-      }
-INITIAL DUE WD: ${deliveryStrategy === "PARTIAL" ? initialDueWorkingDays : "-"
-      }
+INITIAL RELEASE QTY: ${
+      deliveryStrategy === "PARTIAL" ? `${initialReleaseQty} Booklets` : "-"
+    }
+INITIAL DUE WD: ${deliveryStrategy === "PARTIAL" ? initialDueWorkingDays : "-"}
 FINAL DUE WD: ${finalDueWorkingDays}
 PRODUCTION START: ${
       productionStartDate ? formatDateOnly(productionStartDate) : "Not Started"
-      }
-INITIAL DUE DATE: ${initialDueDate ? formatDateOnly(initialDueDate) : "Pending Station 1 & 2"
-      }
-FINAL DUE DATE: ${finalDueDate ? formatDateOnly(finalDueDate) : "Pending Station 1 & 2"
-}
+    }
+INITIAL DUE DATE: ${
+      initialDueDate ? formatDateOnly(initialDueDate) : "Pending Station 1 & 2"
+    }
+FINAL DUE DATE: ${
+      finalDueDate ? formatDateOnly(finalDueDate) : "Pending Station 1 & 2"
+    }
 
 PRODUCTION:
 PAPER: ${body.paperType}
@@ -354,7 +362,7 @@ STATUS: Production Details Complete
           idList: station4ListId,
           ...(trelloDueDate ? { due: trelloDueDate.toISOString() } : {}),
         }),
-      }
+      },
     );
 
     if (!updateRes.ok) {
@@ -363,7 +371,7 @@ STATUS: Production Details Complete
           error: "Failed to update Trello card.",
           details: await updateRes.text(),
         },
-        { status: updateRes.status }
+        { status: updateRes.status },
       );
     }
 
@@ -373,7 +381,7 @@ STATUS: Production Details Complete
       key,
       token,
       boardId,
-      body.orderPriority
+      body.orderPriority,
     );
 
     await fetch(
@@ -382,7 +390,7 @@ STATUS: Production Details Complete
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ value: priorityLabelId }),
-      }
+      },
     );
 
     await resetChecklist(cardId, key, token);
@@ -399,7 +407,7 @@ STATUS: Production Details Complete
             ? error.message
             : "Server error while saving production details.",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

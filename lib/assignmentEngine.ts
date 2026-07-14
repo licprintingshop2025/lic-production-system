@@ -1,9 +1,5 @@
 export type AttendanceStatus =
-  | "Present"
-  | "Half-day AM"
-  | "Half-day PM"
-  | "Absent"
-  | "None";
+  "Present" | "Half-day AM" | "Half-day PM" | "Absent" | "None";
 
 export type Employee = {
   employeeId: string;
@@ -46,7 +42,7 @@ function isAdminOnlyStation(stationName: string) {
   const stationKey = normalize(stationName);
 
   return ADMIN_ONLY_STATIONS.some(
-    (station) => normalize(station) === stationKey
+    (station) => normalize(station) === stationKey,
   );
 }
 
@@ -58,9 +54,7 @@ function isReleaseStation(stationName: string) {
 
 function isAvailable(status?: AttendanceStatus) {
   return (
-    status === "Present" ||
-    status === "Half-day AM" ||
-    status === "Half-day PM"
+    status === "Present" || status === "Half-day AM" || status === "Half-day PM"
   );
 }
 
@@ -137,7 +131,7 @@ export function generateSmartAssignments({
     }
 
     const qualifiedWorkers = activeEmployees.filter((employee) =>
-      employeeCanWork(employee, station.name)
+      employeeCanWork(employee, station.name),
     );
 
     const availableWorkers = qualifiedWorkers

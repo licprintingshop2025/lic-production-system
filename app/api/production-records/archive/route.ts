@@ -27,7 +27,7 @@ const FINAL_LISTS = ["Delivered by LIC", "Picked Up by Client"];
 
 function isFinalList(listName: string) {
   return FINAL_LISTS.some(
-    (finalList) => listName.toUpperCase() === finalList.toUpperCase()
+    (finalList) => listName.toUpperCase() === finalList.toUpperCase(),
   );
 }
 
@@ -44,24 +44,24 @@ export async function GET() {
     if (!key || !token || !boardId) {
       return NextResponse.json(
         { error: "Missing Trello environment variables" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     const listsRes = await fetch(
       `https://api.trello.com/1/boards/${boardId}/lists?key=${key}&token=${token}`,
-      { cache: "no-store" }
+      { cache: "no-store" },
     );
 
     const cardsRes = await fetch(
       `https://api.trello.com/1/boards/${boardId}/cards?key=${key}&token=${token}`,
-      { cache: "no-store" }
+      { cache: "no-store" },
     );
 
     if (!listsRes.ok || !cardsRes.ok) {
       return NextResponse.json(
         { error: "Failed to load Trello data" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -107,7 +107,7 @@ export async function GET() {
 
       const productionTime = calculateProductionTime(
         productionStarted,
-        completedDate
+        completedDate,
       );
 
       const productionRecordRow = [
@@ -137,7 +137,7 @@ export async function GET() {
         error: "Failed to archive production records",
         details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -39,19 +39,19 @@ export async function GET() {
   if (!key || !token || !boardId) {
     return NextResponse.json(
       { error: "Missing Trello environment variables" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
   const res = await fetch(
     `https://api.trello.com/1/boards/${boardId}/lists?cards=open&card_fields=name,desc,labels&key=${key}&token=${token}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
 
   if (!res.ok) {
     return NextResponse.json(
       { error: "Failed to fetch Trello data" },
-      { status: res.status }
+      { status: res.status },
     );
   }
 
@@ -59,8 +59,8 @@ export async function GET() {
 
   const activeLists = lists.filter((list) =>
     ACTIVE_PRODUCTION_STATIONS.some((station) =>
-      list.name.toUpperCase().includes(station)
-    )
+      list.name.toUpperCase().includes(station),
+    ),
   );
 
   const stations = activeLists.map((list) => ({
@@ -71,12 +71,12 @@ export async function GET() {
   const rushOrders = activeLists.flatMap((list) =>
     (list.cards || [])
       .filter((card) =>
-        card.labels?.some((label) => label.name?.toLowerCase() === "rush")
+        card.labels?.some((label) => label.name?.toLowerCase() === "rush"),
       )
       .map((card) => ({
         station: list.name,
         name: card.name,
-      }))
+      })),
   );
 
   return NextResponse.json({

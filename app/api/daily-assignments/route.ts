@@ -46,7 +46,7 @@ export async function GET() {
         error: "Failed to load daily assignments",
         details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
     if (!assignments || !Array.isArray(assignments)) {
       return NextResponse.json(
         { error: "Invalid assignments data" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -89,7 +89,7 @@ export async function POST(req: Request) {
         error: "Failed to save daily assignments",
         details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

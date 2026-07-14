@@ -9,7 +9,7 @@ export async function GET() {
     if (!key || !token || !boardId) {
       return NextResponse.json(
         { error: "Missing Trello environment variables" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -22,7 +22,7 @@ export async function GET() {
     if (!response.ok) {
       return NextResponse.json(
         { error: "Failed to fetch Trello cards" },
-        { status: response.status }
+        { status: response.status },
       );
     }
 
@@ -32,7 +32,7 @@ export async function GET() {
   } catch {
     return NextResponse.json(
       { error: "Server error while fetching Trello cards" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

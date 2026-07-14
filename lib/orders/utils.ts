@@ -54,7 +54,7 @@ export function normalizeDocuments(documents: DocumentItem[] | undefined) {
 
 export function joinDocumentValues(
   documents: DocumentItem[],
-  field: keyof DocumentItem
+  field: keyof DocumentItem,
 ) {
   return documents
     .map((document) => clean(document[field]))

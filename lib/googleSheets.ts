@@ -149,7 +149,10 @@ export async function findNonBIRProductionRecordByCardId(cardId: string) {
   };
 }
 
-export function calculateProductionTime(startDate: string, completedDate: string) {
+export function calculateProductionTime(
+  startDate: string,
+  completedDate: string,
+) {
   const start = new Date(startDate);
   const completed = new Date(completedDate);
 
@@ -195,16 +198,18 @@ export async function createEmployee(employee: EmployeeInput) {
     range: "'Employee Database'!A:H",
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [[
-        employee.employeeId,
-        employee.name,
-        employee.position,
-        employee.skills.join(", "),
-        employee.status,
-        employee.maxStations,
-        employee.shift,
-        employee.employmentType,
-      ]],
+      values: [
+        [
+          employee.employeeId,
+          employee.name,
+          employee.position,
+          employee.skills.join(", "),
+          employee.status,
+          employee.maxStations,
+          employee.shift,
+          employee.employmentType,
+        ],
+      ],
     },
   });
 
@@ -237,16 +242,18 @@ export async function updateEmployee(employee: EmployeeInput) {
     range: `'Employee Database'!A${sheetRowNumber}:H${sheetRowNumber}`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [[
-        employee.employeeId,
-        employee.name,
-        employee.position,
-        employee.skills.join(", "),
-        employee.status,
-        employee.maxStations,
-        employee.shift,
-        employee.employmentType,
-      ]],
+      values: [
+        [
+          employee.employeeId,
+          employee.name,
+          employee.position,
+          employee.skills.join(", "),
+          employee.status,
+          employee.maxStations,
+          employee.shift,
+          employee.employmentType,
+        ],
+      ],
     },
   });
 
@@ -295,7 +302,7 @@ export async function findNonBIROrderByCardId(cardId: string) {
 
 export async function replaceDailyAssignmentsRows(
   date: string,
-  rows: (string | number)[][]
+  rows: (string | number)[][],
 ) {
   const { sheets, sheetId } = getSheetsClient();
 
@@ -314,9 +321,7 @@ export async function replaceDailyAssignmentsRows(
     "Generated Time",
   ];
 
-  const remainingRows = existingRows
-    .slice(1)
-    .filter((row) => row[0] !== date);
+  const remainingRows = existingRows.slice(1).filter((row) => row[0] !== date);
 
   const finalRows = [header, ...remainingRows, ...rows];
 

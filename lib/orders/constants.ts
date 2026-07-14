@@ -14,12 +14,7 @@ export const RECEIPT_TYPES = [
   "OTHER",
 ];
 
-export const MANNER_TYPES = [
-  "BOUND",
-  "LOOSE",
-  "MANUAL",
-  "COMPUTERIZED",
-];
+export const MANNER_TYPES = ["BOUND", "LOOSE", "MANUAL", "COMPUTERIZED"];
 
 export const SETS_PER_BOOKLET_OPTIONS = [
   "25",

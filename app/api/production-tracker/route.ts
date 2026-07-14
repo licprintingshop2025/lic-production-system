@@ -35,10 +35,7 @@ function extractValue(desc: string, labels: string[]) {
   for (const label of labels) {
     const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    const regex = new RegExp(
-      `^${escapedLabel}:\\s*([^\\n]+)`,
-      "gim"
-    );
+    const regex = new RegExp(`^${escapedLabel}:\\s*([^\\n]+)`, "gim");
 
     const matches = [...desc.matchAll(regex)];
 
@@ -75,7 +72,7 @@ function extractNumber(value: string) {
 function hasLabel(card: TrelloCard, labelName: string) {
   return (
     card.labels?.some(
-      (label) => label.name?.toLowerCase() === labelName.toLowerCase()
+      (label) => label.name?.toLowerCase() === labelName.toLowerCase(),
     ) || false
   );
 }
@@ -174,7 +171,7 @@ function buildTrackerRow(card: TrelloCard, stationName: string) {
 
   const businessName = prefer(
     extractValue(desc, ["TRADE NAME"]),
-    extractValue(desc, ["BUSINESS", "BUSINESS NAME"])
+    extractValue(desc, ["BUSINESS", "BUSINESS NAME"]),
   );
 
   const qtyRaw = extractValue(desc, ["QTY", "QUANTITY", "NO. OF BOOKLETS"]);
@@ -198,8 +195,8 @@ function buildTrackerRow(card: TrelloCard, stationName: string) {
   const priority = hasLabel(card, "Rush")
     ? "Rush"
     : hasLabel(card, "Normal")
-    ? "Normal"
-    : prefer(extractValue(desc, ["PRIORITY", "ORDER PRIORITY"]), "Normal");
+      ? "Normal"
+      : prefer(extractValue(desc, ["PRIORITY", "ORDER PRIORITY"]), "Normal");
 
   const specialInstruction =
     extractValue(desc, [
@@ -210,11 +207,11 @@ function buildTrackerRow(card: TrelloCard, stationName: string) {
 
   const deliveryStrategy = prefer(
     extractValue(desc, ["DELIVERY STRATEGY"]),
-    "Complete Order"
+    "Complete Order",
   );
 
   const initialReleaseQty = extractNumber(
-    extractValue(desc, ["INITIAL RELEASE QTY"])
+    extractValue(desc, ["INITIAL RELEASE QTY"]),
   );
 
   const initialDueDate = prefer(extractValue(desc, ["INITIAL DUE DATE"]), "-");
@@ -223,10 +220,12 @@ function buildTrackerRow(card: TrelloCard, stationName: string) {
 
   const initialCommitmentStatus = prefer(
     extractValue(desc, ["INITIAL COMMITMENT STATUS"]),
-    "-"
+    "-",
   );
 
-  const dueDate = card.due ? card.due.split("T")[0] : calculateDueDate(priority);
+  const dueDate = card.due
+    ? card.due.split("T")[0]
+    : calculateDueDate(priority);
 
   const currentDueDate =
     deliveryStrategy === "Partial Release"
@@ -256,7 +255,7 @@ function buildTrackerRow(card: TrelloCard, stationName: string) {
             priority,
             specialInstruction,
           },
-        ]
+        ],
   );
 
   return {
@@ -281,7 +280,8 @@ function buildTrackerRow(card: TrelloCard, stationName: string) {
     initialCommitmentStatus,
     currentDueDate,
     dueDate: currentDueDate,
-    daysRemaining: currentDueDate !== "-" ? workingDaysRemaining(currentDueDate) : 0,
+    daysRemaining:
+      currentDueDate !== "-" ? workingDaysRemaining(currentDueDate) : 0,
     url: card.url,
   };
 }
@@ -294,19 +294,19 @@ export async function GET() {
   if (!key || !token || !boardId) {
     return NextResponse.json(
       { error: "Missing Trello environment variables" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
   const res = await fetch(
     `https://api.trello.com/1/boards/${boardId}/lists?cards=open&card_fields=name,desc,url,dateLastActivity,due,labels&key=${key}&token=${token}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
 
   if (!res.ok) {
     return NextResponse.json(
       { error: "Failed to fetch Trello data" },
-      { status: res.status }
+      { status: res.status },
     );
   }
 
@@ -315,11 +315,11 @@ export async function GET() {
   const rows = lists
     .filter((list) =>
       PRODUCTION_START_STATIONS.some((station) =>
-        list.name.toUpperCase().includes(station)
-      )
+        list.name.toUpperCase().includes(station),
+      ),
     )
     .flatMap((list) =>
-      list.cards.map((card) => buildTrackerRow(card, list.name))
+      list.cards.map((card) => buildTrackerRow(card, list.name)),
     );
 
   rows.sort((a, b) => {
