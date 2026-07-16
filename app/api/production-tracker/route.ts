@@ -50,7 +50,9 @@ function extractValue(desc: string, labels: string[]) {
 function extractTotalBooklets(value: string) {
   if (!value || value === "-") return 0;
 
-  const numbers = value.match(/\d+/g);
+  const normalized = value.replace(/(\d),(?=\d{3}\b)/g, "$1");
+
+  const numbers = normalized.match(/\d+(?:\.\d+)?/g);
 
   if (!numbers) return 0;
 
@@ -58,14 +60,24 @@ function extractTotalBooklets(value: string) {
 }
 
 function extractBookletItems(value: string) {
-  const numbers = value.match(/\d+/g);
+  if (!value || value === "-") return [];
+
+  const normalized = value.replace(/(\d),(?=\d{3}\b)/g, "$1");
+
+  const numbers = normalized.match(/\d+(?:\.\d+)?/g);
+
   if (!numbers) return [];
 
-  return numbers.map((number) => Number(number));
+  return numbers.map(Number);
 }
 
 function extractNumber(value: string) {
-  const match = value.match(/\d+/);
+  if (!value || value === "-") return 0;
+
+  const normalized = value.replace(/,/g, "");
+
+  const match = normalized.match(/\d+(?:\.\d+)?/);
+
   return match ? Number(match[0]) : 0;
 }
 
@@ -286,6 +298,40 @@ function buildTrackerRow(card: TrelloCard, stationName: string) {
   };
 }
 
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit = {},
+  retries = 3,
+) {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+
+      if (response.ok || response.status < 500) {
+        return response;
+      }
+
+      lastError = new Error(
+        `Trello request failed with status ${response.status}`,
+      );
+    } catch (error) {
+      lastError = error;
+    }
+
+    if (attempt < retries) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, attempt * 500),
+      );
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Trello request failed after retries");
+}
+
 export async function GET() {
   const key = process.env.TRELLO_KEY;
   const token = process.env.TRELLO_TOKEN;
@@ -298,10 +344,24 @@ export async function GET() {
     );
   }
 
-  const res = await fetch(
+  let res: Response;
+
+try {
+  res = await fetchWithRetry(
     `https://api.trello.com/1/boards/${boardId}/lists?cards=open&card_fields=name,desc,url,dateLastActivity,due,labels&key=${key}&token=${token}`,
     { cache: "no-store" },
   );
+} catch (error) {
+  console.error("Failed to connect to Trello:", error);
+
+  return NextResponse.json(
+    {
+      error: "Unable to connect to Trello. Please try again.",
+      rows: [],
+    },
+    { status: 503 },
+  );
+}
 
   if (!res.ok) {
     return NextResponse.json(

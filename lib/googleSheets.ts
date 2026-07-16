@@ -58,17 +58,6 @@ export async function getReceivedATPRows() {
   return response.data.values || [];
 }
 
-export async function getProductionRecordRows() {
-  const { sheets, sheetId } = getSheetsClient();
-
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range: "'Production Records'!A:W",
-  });
-
-  return response.data.values || [];
-}
-
 export async function findReceivedATPByCardId(cardId: string) {
   const rows = await getReceivedATPRows();
 
@@ -279,6 +268,28 @@ export async function getNonBIROrderRows() {
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
     range: "'Non-BIR Orders'!A:H",
+  });
+
+  return response.data.values || [];
+}
+
+export async function getBIRProductionRecordRows() {
+  const { sheets, sheetId } = getSheetsClient();
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: "'BIR Production Records'!A:W",
+  });
+
+  return response.data.values || [];
+}
+
+export async function getNonBIRProductionRecordRows() {
+  const { sheets, sheetId } = getSheetsClient();
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: "'Non-BIR Production Records'!A:L",
   });
 
   return response.data.values || [];

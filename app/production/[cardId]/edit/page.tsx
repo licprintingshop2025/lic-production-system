@@ -11,17 +11,22 @@ export default function CompleteProductionDetailsPage() {
   const cardId = params.cardId as string;
 
   const [formData, setFormData] = useState({
-    paperType: "",
-    ply: "",
-    size: "",
-    orderPriority: "",
-    specialInstructions: "",
+  paperType: "",
 
-    deliveryStrategy: "COMPLETE",
-    initialReleaseQty: "10",
-    initialDueWorkingDays: "10",
-    finalDueWorkingDays: "30",
-  });
+  ply: "",
+  customPly: "",
+
+  size: "",
+  customSize: "",
+
+  orderPriority: "",
+  specialInstructions: "",
+
+  deliveryStrategy: "COMPLETE",
+  initialReleaseQty: "10",
+  initialDueWorkingDays: "10",
+  finalDueWorkingDays: "30",
+});
 
   const [loading, setLoading] = useState(false);
 
@@ -30,9 +35,23 @@ export default function CompleteProductionDetailsPage() {
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
     >,
   ) {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
+    const { name, value } = e.target;
+
+    setFormData((prev) => {
+      const updated = {
+        ...prev,
+        [name]: value,
+      };
+
+      if (name === "ply" && value !== "Other") {
+        updated.customPly = "";
+      }
+
+      if (name === "size" && value !== "Other") {
+        updated.customSize = "";
+      }
+
+      return updated;
     });
   }
 
@@ -41,10 +60,25 @@ export default function CompleteProductionDetailsPage() {
     setLoading(true);
 
     try {
+
+      const payload = {
+        ...formData,
+        ply:
+          formData.ply === "Other"
+            ? formData.customPly
+            : formData.ply,
+
+        size:
+          formData.size === "Other"
+            ? formData.customSize
+            : formData.size,
+      };
+
+
       const res = await fetch(`/api/production/${cardId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       const result = await res.json();
@@ -100,23 +134,69 @@ export default function CompleteProductionDetailsPage() {
               required
             />
 
-            <Select
-              label="Ply"
-              name="ply"
-              value={formData.ply}
-              options={["2-Ply", "3-Ply"]}
-              onChange={handleChange}
-              required
-            />
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#3f352a]">
+                Ply <span className="text-red-500">*</span>
+              </label>
 
-            <Select
-              label="Size"
-              name="size"
-              value={formData.size}
-              options={["1/3", "1/4", "1/2", "Whole"]}
-              onChange={handleChange}
-              required
-            />
+              <select
+                name="ply"
+                value={formData.ply}
+                onChange={handleChange}
+                required
+                className="w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
+              >
+                <option value="">Select</option>
+                <option value="2-Ply">2-Ply</option>
+                <option value="3-Ply">3-Ply</option>
+                <option value="Other">Other</option>
+              </select>
+
+              {formData.ply === "Other" && (
+                <input
+                  type="text"
+                  name="customPly"
+                  value={formData.customPly}
+                  onChange={handleChange}
+                  required
+                  placeholder="Enter custom ply"
+                  className="mt-3 w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#3f352a]">
+                Size <span className="text-red-500">*</span>
+              </label>
+
+              <select
+                name="size"
+                value={formData.size}
+                onChange={handleChange}
+                required
+                className="w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
+              >
+                <option value="">Select</option>
+                <option value="1/3">1/3</option>
+                <option value="1/4">1/4</option>
+                <option value="1/2">1/2</option>
+                <option value="Whole">Whole</option>
+                <option value="Other">Other</option>
+              </select>
+
+              {formData.size === "Other" && (
+                <input
+                  type="text"
+                  name="customSize"
+                  value={formData.customSize}
+                  onChange={handleChange}
+                  required
+                  placeholder="Enter custom size"
+                  className="mt-3 w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
+                />
+              )}
+            </div>
 
             <Select
               label="Order Priority"

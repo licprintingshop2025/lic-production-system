@@ -2,6 +2,11 @@ import AppShell from "./components/AppShell";
 import PageHeader from "./components/PageHeader";
 import ProductionSyncRunner from "./components/ProductionSyncRunner";
 
+import {
+  formatProductionVolume,
+  getDashboardProductionVolume,
+} from "@/lib/dashboardAnalytics";
+
 type TrelloCard = {
   id: string;
   name: string;
@@ -21,6 +26,7 @@ type TrackerRow = {
   trackingNo: string;
   atpId: string;
   businessName: string;
+  orderQuantity: number;
   orderPriority: string;
   currentStation: string;
   dueDate: string;
@@ -86,6 +92,9 @@ export default async function Home() {
   const lists = await getLists();
   const trackerRows = await getTrackerRows();
 
+  const productionVolume =
+    await getDashboardProductionVolume(trackerRows);
+
   const atpWaiting = getListCount(lists, "ATP Intake");
   const nonBirWaiting = getListCount(lists, "Non-BIR Intake");
 
@@ -132,9 +141,6 @@ export default async function Home() {
       {} as Record<string, number>,
     );
 
-  const topBusyStations = Object.entries(stationLoads)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3);
 
   const urgentOrders = [...overdue, ...dueToday, ...rushJobs]
     .filter(
@@ -250,36 +256,41 @@ export default async function Home() {
         </div>
 
         <div className="rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
-          <h2 className="mb-5 text-xl font-bold">Top Busy Stations</h2>
+          <div className="mb-5">
+            <h2 className="text-xl font-bold">Production Volume</h2>
 
-          <div className="space-y-3">
-            {topBusyStations.length === 0 ? (
-              <p className="rounded-lg bg-[#fbf7ef] p-4 text-sm text-[#6f6254]">
-                No busy stations yet.
-              </p>
-            ) : (
-              topBusyStations.map(([station, count]) => {
-                const status = getStatus(count);
+            <p className="mt-1 text-sm text-[#6f6254]">
+              Incoming, active, and completed booklets
+            </p>
+          </div>
 
-                return (
-                  <div
-                    key={station}
-                    className="flex items-center justify-between rounded-lg border border-[#eee4d6] p-4"
-                  >
-                    <div>
-                      <p className="font-bold">{station}</p>
-                      <p className="text-sm">{count} jobs</p>
-                    </div>
+          <div className="space-y-1">
+            <ProductionVolumeRow
+              label="Today Entered"
+              value={productionVolume.enteredToday}
+            />
 
-                    <span
-                      className={`rounded-md px-3 py-1 text-xs font-bold ${status.color}`}
-                    >
-                      {status.label}
-                    </span>
-                  </div>
-                );
-              })
-            )}
+            <ProductionVolumeRow
+              label="This Week Entered"
+              value={productionVolume.enteredThisWeek}
+            />
+
+            <ProductionVolumeRow
+              label="This Month Entered"
+              value={productionVolume.enteredThisMonth}
+            />
+
+            <div className="my-3 border-t border-[#eee4d6]" />
+
+            <ProductionVolumeRow
+              label="Currently in Production"
+              value={productionVolume.currentlyInProduction}
+            />
+
+            <ProductionVolumeRow
+              label="Completed This Month"
+              value={productionVolume.completedThisMonth}
+            />
           </div>
         </div>
       </section>
@@ -357,6 +368,32 @@ export default async function Home() {
         © 2026 LIC Printing Shop. Production Management System.
       </footer>
     </AppShell>
+  );
+}
+
+function ProductionVolumeRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-lg px-1 py-3">
+      <span className="text-sm font-semibold text-[#5f5448]">
+        {label}
+      </span>
+
+      <div className="text-right">
+        <span className="text-xl font-black text-black">
+          {formatProductionVolume(value)}
+        </span>
+
+        <span className="ml-1 text-xs text-[#7c6a56]">
+          Booklets
+        </span>
+      </div>
+    </div>
   );
 }
 
