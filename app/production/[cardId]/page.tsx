@@ -1,3 +1,4 @@
+import Link from "next/link";
 import AppShell from "../../components/AppShell";
 import PageHeader from "../../components/PageHeader";
 import {
@@ -385,16 +386,17 @@ function BottomActions({ trelloUrl }: { trelloUrl: string }) {
         </p>
 
         <div className="flex gap-3">
-          <a
+          <Link
             href="/production"
             className="rounded-lg border border-[#e6ddd1] bg-white px-6 py-3 text-sm font-bold text-black hover:bg-[#fbf7ef]"
           >
             Back to Queue
-          </a>
+          </Link>
 
           <a
             href={trelloUrl}
             target="_blank"
+            rel="noopener noreferrer"
             className="rounded-lg bg-[#e1bb5f] px-6 py-3 text-sm font-black text-black hover:bg-[#edca73]"
           >
             Open in Trello

@@ -30,12 +30,10 @@ export default function AppShell({
   children,
   contentWidth = "standard",
 }: AppShellProps) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const [menuOpenedAtPath, setMenuOpenedAtPath] = useState<string | null>(null);
 
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
+  const mobileMenuOpen = menuOpenedAtPath === pathname;
 
   useEffect(() => {
     document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
@@ -53,7 +51,7 @@ export default function AppShell({
         <div className="flex min-w-0 flex-1 flex-col">
           <MobileHeader
             menuOpen={mobileMenuOpen}
-            onMenuClick={() => setMobileMenuOpen(true)}
+            onMenuClick={() => setMenuOpenedAtPath(pathname)}
           />
 
           <section className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-9 lg:py-8">
@@ -69,7 +67,7 @@ export default function AppShell({
       <MobileSidebar
         activePage={activePage}
         open={mobileMenuOpen}
-        onClose={() => setMobileMenuOpen(false)}
+        onClose={() => setMenuOpenedAtPath(null)}
       />
     </main>
   );

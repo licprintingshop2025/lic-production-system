@@ -1,7 +1,4 @@
 "use client";
-
-import { useEffect, useState } from "react";
-
 export default function PageHeader({
   eyebrow = "LIC Operations Center",
   title,
@@ -11,11 +8,7 @@ export default function PageHeader({
   title: string;
   description: string;
 }) {
-  const [lastUpdated, setLastUpdated] = useState("");
-
-  useEffect(() => {
-    setLastUpdated(new Date().toLocaleString());
-  }, []);
+  const lastUpdated = new Date().toLocaleString();
 
   return (
     <header className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
@@ -32,7 +25,8 @@ export default function PageHeader({
       </div>
 
       <div className="rounded-lg border border-[#e6ddd1] bg-white px-6 py-4 text-sm text-[#5f5448] shadow-sm">
-        Last Updated: {lastUpdated || "Loading..."}
+        Last Updated:{" "}
+        <span suppressHydrationWarning>{lastUpdated}</span>
       </div>
     </header>
   );

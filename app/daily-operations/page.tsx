@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import AppShell from "../components/AppShell";
 import PageHeader from "../components/PageHeader";
 import ProductionSyncRunner from "../components/ProductionSyncRunner";
@@ -71,7 +77,6 @@ export default function DailyOperationsPage() {
   const [attendance, setAttendance] = useState<Record<string, Status>>({});
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [generatedAt, setGeneratedAt] = useState("");
-  const [hasGenerated, setHasGenerated] = useState(false);
   const [dailyData, setDailyData] = useState<DailyOpsData>({
     stations: [],
     rushOrders: [],
@@ -88,78 +93,112 @@ export default function DailyOperationsPage() {
     [employees],
   );
 
-  useEffect(() => {
-    loadAll();
+  const loadEmployees = useCallback(async () => {
+    try {
+      const res = await fetch("/api/employees", {
+        cache: "no-store",
+      });
 
-    const interval = setInterval(() => {
-      loadDailyData();
-    }, 30000);
+      if (!res.ok) {
+        console.error("Employee fetch failed:", res.status);
+        return;
+      }
 
-    return () => clearInterval(interval);
+      const data = await res.json();
+      const loadedEmployees = (data.employees || []) as Employee[];
+
+      setEmployees(loadedEmployees);
+
+      const loadedActiveEmployees = loadedEmployees.filter(
+        (employee) =>
+          employee.status?.toString().trim().toLowerCase() === "active",
+      );
+
+      setAttendance((currentAttendance) => {
+        return Object.fromEntries(
+          loadedActiveEmployees.map((employee) => [
+            employee.name,
+            currentAttendance[employee.name] ??
+            (employee.employmentType?.toLowerCase() === "ojt"
+              ? "None"
+              : "Present"),
+          ]),
+        ) as Record<string, Status>;
+      });
+    } catch (error) {
+      console.error("Employee fetch failed:", error);
+    }
   }, []);
 
-  useEffect(() => {
-    if (!activeEmployees.length) return;
-
-    const defaultAttendance = Object.fromEntries(
-      activeEmployees.map((employee) => [
-        employee.name,
-        employee.employmentType?.toLowerCase() === "ojt" ? "None" : "Present",
-      ]),
-    ) as Record<string, Status>;
-
-    setAttendance(defaultAttendance);
-  }, [activeEmployees]);
-
-  async function loadAll() {
-    await Promise.all([
-      loadEmployees(),
-      loadDailyData(),
-      loadTodayAssignments(),
-    ]);
-  }
-
-  async function loadEmployees() {
-    const res = await fetch("/api/employees", { cache: "no-store" });
-    if (!res.ok) return;
-
-    const data = await res.json();
-    setEmployees(data.employees || []);
-  }
-
-  async function loadDailyData() {
+  const loadDailyData = useCallback(async () => {
     try {
-      const res = await fetch("/api/daily-operations", { cache: "no-store" });
-      if (!res.ok) return;
+      const res = await fetch("/api/daily-operations", {
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        console.error("Daily operations fetch failed:", res.status);
+        return;
+      }
 
       const data = await res.json();
       setDailyData(data);
     } catch (error) {
       console.error("Daily operations fetch failed:", error);
     }
-  }
+  }, []);
 
-  async function loadTodayAssignments() {
-    const res = await fetch("/api/daily-assignments", {
-      cache: "no-store",
-    });
+  const loadTodayAssignments = useCallback(async () => {
+    try {
+      const res = await fetch("/api/daily-assignments", {
+        cache: "no-store",
+      });
 
-    if (!res.ok) return;
+      if (!res.ok) {
+        console.error("Daily assignments fetch failed:", res.status);
+        return;
+      }
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (data.assignments?.length > 0) {
-      setAssignments(data.assignments);
-      setGeneratedAt(data.generatedAt || "");
-      setHasGenerated(true);
-      lastSavedSignatureRef.current = assignmentSignature(data.assignments);
+      if (data.assignments?.length > 0) {
+        setAssignments(data.assignments);
+        setGeneratedAt(data.generatedAt || "");
+        lastSavedSignatureRef.current = assignmentSignature(data.assignments);
+      }
+    } catch (error) {
+      console.error("Daily assignments fetch failed:", error);
     }
-  }
+  }, []);
 
-  function getStationJobsFromData(data: DailyOpsData, stationName: string) {
+  const loadAll = useCallback(async () => {
+    await Promise.all([
+      loadEmployees(),
+      loadDailyData(),
+      loadTodayAssignments(),
+    ]);
+  }, [loadEmployees, loadDailyData, loadTodayAssignments]);
+
+  useEffect(() => {
+    void loadAll();
+
+    const interval = window.setInterval(() => {
+      void loadDailyData();
+    }, 30000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [loadAll, loadDailyData]);
+
+  function getStationJobsFromData(
+    data: DailyOpsData,
+    stationName: string,
+  ) {
     return (
-      data.stations.find((station) => stationMatches(station.name, stationName))
-        ?.jobs || 0
+      data.stations.find((station) =>
+        stationMatches(station.name, stationName),
+      )?.jobs || 0
     );
   }
 
@@ -174,10 +213,7 @@ export default function DailyOperationsPage() {
     }));
   }
 
-  async function saveAssignments(
-    nextAssignments: Assignment[],
-    sourceAttendance: Record<string, Status>,
-  ) {
+  async function saveAssignments(nextAssignments: Assignment[]) {
     const signature = assignmentSignature(nextAssignments);
 
     if (signature === lastSavedSignatureRef.current) return;
@@ -189,24 +225,41 @@ export default function DailyOperationsPage() {
     setAssignments(nextAssignments);
     setGeneratedAt(now);
 
-    await fetch("/api/daily-assignments", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        assignments: nextAssignments,
-      }),
-    });
+    try {
+      const res = await fetch("/api/daily-assignments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          assignments: nextAssignments,
+        }),
+      });
+
+      if (!res.ok) {
+        console.error("Saving daily assignments failed:", res.status);
+        lastSavedSignatureRef.current = "";
+      }
+    } catch (error) {
+      console.error("Saving daily assignments failed:", error);
+      lastSavedSignatureRef.current = "";
+    }
   }
 
   async function handleGenerateAssignments() {
-    const res = await fetch("/api/daily-operations", { cache: "no-store" });
-    if (!res.ok) return;
+  try {
+    const res = await fetch("/api/daily-operations", {
+      cache: "no-store",
+    });
 
-    const latestData = await res.json();
+    if (!res.ok) {
+      console.error("Daily operations refresh failed:", res.status);
+      return;
+    }
+
+    const latestData = (await res.json()) as DailyOpsData;
+
     setDailyData(latestData);
-    setHasGenerated(true);
 
     const result = generateSmartAssignments({
       employees: activeEmployees,
@@ -214,7 +267,10 @@ export default function DailyOperationsPage() {
       attendance,
     });
 
-    await saveAssignments(result.assignments, attendance);
+    await saveAssignments(result.assignments);
+  } catch (error) {
+    console.error("Assignment generation failed:", error);
+  }
   }
 
   function updateStatus(workerName: string, status: Status) {
@@ -235,7 +291,6 @@ export default function DailyOperationsPage() {
     setAttendance(defaultAttendance);
     setAssignments([]);
     setGeneratedAt("");
-    setHasGenerated(false);
     lastSavedSignatureRef.current = "";
   }
 

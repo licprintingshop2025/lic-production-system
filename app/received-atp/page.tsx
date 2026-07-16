@@ -85,22 +85,6 @@ export default function ReceivedATPPage() {
     }));
   }
 
-  function joinDocuments(
-    field: keyof DocumentItem,
-    fallbackField?: keyof DocumentItem,
-  ) {
-    return formData.documents
-      .map((doc) => {
-        if (fallbackField && doc[field] === "OTHER") {
-          return doc[fallbackField];
-        }
-
-        return doc[field];
-      })
-      .filter(Boolean)
-      .join(" / ");
-  }
-
   function handleReset() {
     setFormData(initialFormData);
     setSavedTrackingNo("");

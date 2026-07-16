@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AppShell from "../../components/AppShell";
 import PageHeader from "../../components/PageHeader";
 
@@ -42,20 +42,25 @@ export default function EmployeeDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    loadEmployee();
-  }, []);
 
-  async function loadEmployee() {
+
+  const loadEmployee = useCallback(async () => {
     try {
       setLoading(true);
 
       const res = await fetch("/api/employees", { cache: "no-store" });
+
+      if (!res.ok) {
+        setEmployee(null);
+        return;
+      }
+
       const data = await res.json();
 
       const found = data.employees?.find(
         (item: Employee) =>
-          item.employeeId?.toString().trim() === employeeId.toString().trim(),
+          item.employeeId?.toString().trim() ===
+          employeeId.toString().trim(),
       );
 
       if (!found) {
@@ -73,10 +78,17 @@ export default function EmployeeDetailsPage() {
         shift: found.shift || "Whole Day",
         employmentType: found.employmentType || "Full-time",
       });
+    } catch (error) {
+      console.error("Employee fetch failed:", error);
+      setEmployee(null);
     } finally {
       setLoading(false);
     }
-  }
+  }, [employeeId]);
+
+  useEffect(() => {
+    void loadEmployee();
+  }, [loadEmployee]);
 
   function updateField(field: keyof Employee, value: string | number) {
     if (!employee) return;

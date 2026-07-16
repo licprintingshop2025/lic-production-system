@@ -1,3 +1,4 @@
+import Link from "next/link";
 import AppShell from "../components/AppShell";
 import PageHeader from "../components/PageHeader";
 
@@ -28,15 +29,6 @@ async function getEmployees() {
 export default async function EmployeesPage() {
   const employees = await getEmployees();
 
-  const activeCount = employees.filter(
-    (employee) => employee.status?.toString().trim().toLowerCase() === "active",
-  ).length;
-
-  const inactiveCount = employees.length - activeCount;
-
-  const skilledCount = employees.filter(
-    (employee) => employee.skills && employee.skills.length > 0,
-  ).length;
 
   return (
     <AppShell activePage="employees" contentWidth="wide">
@@ -60,17 +52,18 @@ export default async function EmployeesPage() {
             <a
               href="https://docs.google.com/spreadsheets"
               target="_blank"
+              rel="noopener noreferrer"
               className="rounded-lg border border-[#e6ddd1] bg-white px-5 py-2 text-sm font-bold text-black hover:bg-[#fbf7ef]"
             >
               Open Google Sheets
             </a>
 
-            <a
+            <Link
               href="/employees/new"
               className="rounded-lg bg-[#e1bb5f] px-5 py-2 text-sm font-black text-black hover:bg-[#edca73]"
             >
               + New Employee
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -167,19 +160,19 @@ export default async function EmployeesPage() {
 
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-2">
-                          <a
+                          <Link
                             href={`/employees/${employee.employeeId}`}
-                            className="rounded-lg border border-[#e6ddd1] bg-white px-4 py-2 text-sm font-bold text-black hover:bg-[#fbf7ef]"
+                            className="..."
                           >
                             View
-                          </a>
+                          </Link>
 
-                          <a
+                          <Link
                             href={`/employees/${employee.employeeId}`}
-                            className="rounded-lg bg-[#e1bb5f] px-4 py-2 text-sm font-bold text-black hover:bg-[#edca73]"
+                            className="..."
                           >
                             Edit
-                          </a>
+                          </Link>
                         </div>
                       </td>
                     </tr>

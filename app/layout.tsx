@@ -12,7 +12,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "LIC Printing Shop | Production System",
   description: "Production management system for LIC Printing Shop",
   icons: {
