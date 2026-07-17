@@ -25,18 +25,32 @@ function parseQuantity(value: unknown) {
 
   if (typeof value !== "string") return 0;
 
-  const normalized = value
-    .replace(/,/g, "")
-    .replace(/[^\d.-]/g, "")
-    .trim();
+  const trimmed = value.trim();
 
-  if (!normalized) return 0;
+  if (!trimmed || trimmed === "-") return 0;
 
-  const parsed = Number(normalized);
+  // Remove commas used as thousand separators.
+  // Example: 1,500 becomes 1500.
+  const normalized = trimmed.replace(
+    /(\d),(?=\d{3}(?:\D|$))/g,
+    "$1",
+  );
 
-  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  // Supports:
+  // 50/50       = 100
+  // 10 / 20 / 30 = 60
+  // 1,500       = 1500
+  const quantities = normalized.match(/\d+(?:\.\d+)?/g);
 
-  return parsed;
+  if (!quantities) return 0;
+
+  return quantities.reduce((total, quantity) => {
+    const parsed = Number(quantity);
+
+    return Number.isFinite(parsed) && parsed > 0
+      ? total + parsed
+      : total;
+  }, 0);
 }
 
 function parseSheetDate(value: unknown) {

@@ -1,5 +1,11 @@
 import { formatPHDateTime } from "@/lib/dateTime";
 import {
+  INITIAL_COMMITMENT_CHECKLIST_NAME,
+  INITIAL_RELEASE_ITEM_NAME,
+  PARTIAL_ORDER_LABEL_NAME,
+  namesMatch,
+} from "@/lib/trelloWorkflow";
+import {
   appendBIRProductionRecord,
   appendNonBIRProductionRecord,
   calculateProductionTime,
@@ -63,25 +69,12 @@ type ProductionSyncResult = {
   lastUpdated: string | null;
 };
 
-const CHECKLIST_REQUIRED_LISTS = ["Finish Receipt", "Ready for Release"];
-
 const ARCHIVE_LISTS = ["Delivered by LIC", "Picked Up by Client"];
 
 const PRODUCTION_START_LIST = "Station 1 & 2 (Layouting & Encoding)";
 const COMPLETED_LIST = "Finish Receipt";
 
 const AUTO_ARCHIVE_AFTER_DAYS = 7;
-
-function findChecklistsByName(
-  checklists: TrelloChecklist[],
-  name: string,
-): TrelloChecklist[] {
-  const normalizedName = normalize(name);
-
-  return checklists.filter(
-    (checklist) => normalize(checklist.name) === normalizedName,
-  );
-}
 
 function hasCompletedCheckItem(
   checklist: TrelloChecklist,
@@ -96,32 +89,6 @@ function hasCompletedCheckItem(
         item.state === "complete",
     ) ?? false
   );
-}
-
-function chooseChecklistToKeep(
-  checklists: TrelloChecklist[],
-  completedItemName: string,
-  preferredChecklistId?: string,
-): TrelloChecklist {
-  const completedChecklist = checklists.find((checklist) =>
-    hasCompletedCheckItem(checklist, completedItemName),
-  );
-
-  if (completedChecklist) {
-    return completedChecklist;
-  }
-
-  if (preferredChecklistId) {
-    const preferredChecklist = checklists.find(
-      (checklist) => checklist.id === preferredChecklistId,
-    );
-
-    if (preferredChecklist) {
-      return preferredChecklist;
-    }
-  }
-
-  return checklists[0];
 }
 
 function normalize(value: string): string {
@@ -252,234 +219,7 @@ async function getCardChecklists(
   return (await res.json()) as TrelloChecklist[];
 }
 
-async function deleteChecklist(
-  checklistId: string,
-  key: string,
-  token: string,
-): Promise<void> {
-  const res = await fetch(
-    `https://api.trello.com/1/checklists/${checklistId}?key=${key}&token=${token}`,
-    {
-      method: "DELETE",
-    },
-  );
-
-  if (!res.ok) {
-    throw new Error(
-      `Failed to delete duplicate Trello checklist ${checklistId}`,
-    );
-  }
-}
-
-async function deleteDuplicateChecklists(
-  checklists: TrelloChecklist[],
-  checklistToKeep: TrelloChecklist,
-  key: string,
-  token: string,
-): Promise<void> {
-  const duplicates = checklists.filter(
-    (checklist) => checklist.id !== checklistToKeep.id,
-  );
-
-  for (const duplicate of duplicates) {
-    await deleteChecklist(duplicate.id, key, token);
-  }
-}
-
-async function ensureStatusChecklist(
-  cardId: string,
-  key: string,
-  token: string,
-): Promise<boolean> {
-  const existingChecklists = await getCardChecklists(cardId, key, token);
-
-  const matchingChecklists = findChecklistsByName(existingChecklists, "Status");
-
-  if (matchingChecklists.length > 1) {
-    const checklistToKeep = chooseChecklistToKeep(matchingChecklists, "Done");
-
-    await deleteDuplicateChecklists(
-      matchingChecklists,
-      checklistToKeep,
-      key,
-      token,
-    );
-
-    return false;
-  }
-
-  if (matchingChecklists.length === 1) {
-    return false;
-  }
-
-  const createChecklistRes = await fetch(
-    `https://api.trello.com/1/checklists?key=${key}&token=${token}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        idCard: cardId,
-        name: "Status",
-      }),
-    },
-  );
-
-  if (!createChecklistRes.ok) {
-    throw new Error(`Failed to create Status checklist for card ${cardId}`);
-  }
-
-  const createdChecklist = (await createChecklistRes.json()) as TrelloChecklist;
-
-  const createItemRes = await fetch(
-    `https://api.trello.com/1/checklists/${createdChecklist.id}/checkItems?key=${key}&token=${token}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: "Done",
-        checked: false,
-      }),
-    },
-  );
-
-  if (!createItemRes.ok) {
-    throw new Error(
-      `Status checklist was created, but the Done item could not be created for card ${cardId}`,
-    );
-  }
-
-  const verifiedChecklists = await getCardChecklists(cardId, key, token);
-
-  const verifiedMatches = findChecklistsByName(verifiedChecklists, "Status");
-
-  if (verifiedMatches.length > 1) {
-    const checklistToKeep = chooseChecklistToKeep(
-      verifiedMatches,
-      "Done",
-      createdChecklist.id,
-    );
-
-    await deleteDuplicateChecklists(
-      verifiedMatches,
-      checklistToKeep,
-      key,
-      token,
-    );
-  }
-
-  return true;
-}
-
-async function ensureInitialCommitmentChecklist(
-  card: TrelloCard,
-  key: string,
-  token: string,
-): Promise<boolean> {
-  const isPartial = /DELIVERY STRATEGY:\s*Partial Release/i.test(card.desc);
-
-  if (!isPartial) {
-    return false;
-  }
-
-  const existingChecklists = await getCardChecklists(card.id, key, token);
-
-  const matchingChecklists = findChecklistsByName(
-    existingChecklists,
-    "Initial Commitment",
-  );
-
-  if (matchingChecklists.length > 1) {
-    const checklistToKeep = chooseChecklistToKeep(
-      matchingChecklists,
-      "Initial Release Completed",
-    );
-
-    await deleteDuplicateChecklists(
-      matchingChecklists,
-      checklistToKeep,
-      key,
-      token,
-    );
-
-    return false;
-  }
-
-  if (matchingChecklists.length === 1) {
-    return false;
-  }
-
-  const createChecklistRes = await fetch(
-    `https://api.trello.com/1/checklists?key=${key}&token=${token}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        idCard: card.id,
-        name: "Initial Commitment",
-      }),
-    },
-  );
-
-  if (!createChecklistRes.ok) {
-    throw new Error(
-      `Failed to create Initial Commitment checklist for card ${card.id}`,
-    );
-  }
-
-  const createdChecklist = (await createChecklistRes.json()) as TrelloChecklist;
-
-  const createItemRes = await fetch(
-    `https://api.trello.com/1/checklists/${createdChecklist.id}/checkItems?key=${key}&token=${token}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: "Initial Release Completed",
-        checked: false,
-      }),
-    },
-  );
-
-  if (!createItemRes.ok) {
-    throw new Error(
-      `Checklist was created, but its item could not be created for card ${card.id}`,
-    );
-  }
-
-  const verifiedChecklists = await getCardChecklists(card.id, key, token);
-
-  const verifiedMatches = findChecklistsByName(
-    verifiedChecklists,
-    "Initial Commitment",
-  );
-
-  if (verifiedMatches.length > 1) {
-    const checklistToKeep = chooseChecklistToKeep(
-      verifiedMatches,
-      "Initial Release Completed",
-      createdChecklist.id,
-    );
-
-    await deleteDuplicateChecklists(
-      verifiedMatches,
-      checklistToKeep,
-      key,
-      token,
-    );
-  }
-
-  return true;
-}
-
-async function isInitialCommitmentCompleted(
+async function isInitialReleaseCompleted(
   cardId: string,
   key: string,
   token: string,
@@ -488,8 +228,8 @@ async function isInitialCommitmentCompleted(
 
   return checklists.some(
     (checklist) =>
-      normalize(checklist.name) === "INITIAL COMMITMENT" &&
-      hasCompletedCheckItem(checklist, "Initial Release Completed"),
+      namesMatch(checklist.name, INITIAL_COMMITMENT_CHECKLIST_NAME) &&
+      hasCompletedCheckItem(checklist, INITIAL_RELEASE_ITEM_NAME),
   );
 }
 
@@ -526,7 +266,10 @@ async function setDueDateIfProductionStarted({
   );
 
   const deliveryStrategyIsPartial =
-    /DELIVERY STRATEGY:\s*Partial Release/i.test(card.desc);
+    /DELIVERY STRATEGY:\s*Partial Release/i.test(card.desc) ||
+    card.labels?.some((label) =>
+      namesMatch(label.name, PARTIAL_ORDER_LABEL_NAME),
+    ) === true;
 
   const initialDueMatch = card.desc.match(/INITIAL DUE WD:\s*(\d+)/i);
   const finalDueMatch = card.desc.match(/FINAL DUE WD:\s*(\d+)/i);
@@ -556,12 +299,12 @@ async function setDueDateIfProductionStarted({
     deliveryStrategyIsPartial ? finalWorkingDays : completeOrderWorkingDays,
   );
 
-  const initialCommitmentCompleted = deliveryStrategyIsPartial
-    ? await isInitialCommitmentCompleted(card.id, key, token)
+  const initialReleaseCompleted = deliveryStrategyIsPartial
+    ? await isInitialReleaseCompleted(card.id, key, token)
     : false;
 
   const trelloDueDate =
-    deliveryStrategyIsPartial && !initialCommitmentCompleted
+    deliveryStrategyIsPartial && !initialReleaseCompleted
       ? initialDueDate
       : finalDueDate;
 
@@ -594,7 +337,7 @@ async function setDueDateIfProductionStarted({
     updatedDesc,
     "INITIAL COMMITMENT STATUS",
     deliveryStrategyIsPartial
-      ? initialCommitmentCompleted
+      ? initialReleaseCompleted
         ? "Completed"
         : "Pending"
       : "-",
@@ -621,7 +364,7 @@ async function setDueDateIfProductionStarted({
   const expectedFinalDue = formatDateOnly(finalDueDate);
 
   const expectedCommitmentStatus = deliveryStrategyIsPartial
-    ? initialCommitmentCompleted
+    ? initialReleaseCompleted
       ? "Completed"
       : "Pending"
     : "-";
@@ -685,7 +428,7 @@ async function executeProductionSync(): Promise<ProductionSyncResult> {
 
   const listMap = new Map(lists.map((list) => [list.id, list.name]));
 
-  let checklistsCreated = 0;
+  const checklistsCreated = 0;
   let dueDatesCreated = 0;
   let archived = 0;
   let trelloCardsArchived = 0;
@@ -703,16 +446,6 @@ async function executeProductionSync(): Promise<ProductionSyncResult> {
     });
 
     if (dueCreated) dueDatesCreated++;
-
-    if (isInList(currentList, [PRODUCTION_START_LIST])) {
-      const created = await ensureInitialCommitmentChecklist(card, key, token);
-      if (created) checklistsCreated++;
-    }
-
-    if (isInList(currentList, CHECKLIST_REQUIRED_LISTS)) {
-      const created = await ensureStatusChecklist(card.id, key, token);
-      if (created) checklistsCreated++;
-    }
 
     if (isInList(currentList, ARCHIVE_LISTS)) {
       const actions = await getCardMoveActions(card.id, key, token);

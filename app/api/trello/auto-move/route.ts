@@ -1,4 +1,11 @@
 import { NextResponse } from "next/server";
+import {
+  DONE_ITEM_NAME,
+  INITIAL_COMMITMENT_CHECKLIST_NAME,
+  INITIAL_RELEASE_ITEM_NAME,
+  PARTIAL_ORDER_LABEL_NAME,
+  STATUS_CHECKLIST_NAME,
+} from "@/lib/trelloWorkflow";
 
 type TrelloLabel = {
   id: string;
@@ -56,11 +63,6 @@ const STATION_FLOW = [
 ];
 
 const WIP_LIMIT = 20;
-
-const STATUS_CHECKLIST_NAME = "Status";
-const DONE_ITEM_NAME = "Done";
-const INITIAL_RELEASE_ITEM_NAME = "Initial release completed";
-const PARTIAL_ORDER_LABEL_NAME = "Partial Order";
 
 async function trelloFetch<T>(
   endpoint: string,
@@ -130,6 +132,12 @@ function isStatusChecklist(checklist: Checklist): boolean {
   return normalize(checklist.name) === normalize(STATUS_CHECKLIST_NAME);
 }
 
+function isInitialCommitmentChecklist(checklist: Checklist): boolean {
+  return (
+    normalize(checklist.name) === normalize(INITIAL_COMMITMENT_CHECKLIST_NAME)
+  );
+}
+
 function isNamedItem(item: ChecklistItem, expectedName: string): boolean {
   return normalize(item.name) === normalize(expectedName);
 }
@@ -141,28 +149,12 @@ function findItemsByName(
   return checklist.checkItems.filter((item) => isNamedItem(item, itemName));
 }
 
-function findDoneItems(checklist: Checklist): ChecklistItem[] {
-  return findItemsByName(checklist, DONE_ITEM_NAME);
+function hasItem(checklist: Checklist, itemName: string): boolean {
+  return findItemsByName(checklist, itemName).length > 0;
 }
 
-function findInitialReleaseItems(checklist: Checklist): ChecklistItem[] {
-  return findItemsByName(checklist, INITIAL_RELEASE_ITEM_NAME);
-}
-
-function hasDoneItem(checklist: Checklist): boolean {
-  return findDoneItems(checklist).length > 0;
-}
-
-function hasInitialReleaseItem(checklist: Checklist): boolean {
-  return findInitialReleaseItems(checklist).length > 0;
-}
-
-function hasCompletedDone(checklist: Checklist): boolean {
-  return findDoneItems(checklist).some((item) => item.state === "complete");
-}
-
-function hasCompletedInitialRelease(checklist: Checklist): boolean {
-  return findInitialReleaseItems(checklist).some(
+function hasCompletedItem(checklist: Checklist, itemName: string): boolean {
+  return findItemsByName(checklist, itemName).some(
     (item) => item.state === "complete",
   );
 }
@@ -172,9 +164,7 @@ function chooseChecklistPreferCompleted(
   itemName: string,
 ): Checklist | undefined {
   const completedChecklist = checklists.find((checklist) =>
-    checklist.checkItems.some(
-      (item) => isNamedItem(item, itemName) && item.state === "complete",
-    ),
+    hasCompletedItem(checklist, itemName),
   );
 
   if (completedChecklist) {
@@ -229,8 +219,9 @@ async function createCheckItem(
   });
 }
 
-async function createStatusChecklistWithItem(
+async function createChecklistWithItem(
   cardId: string,
+  checklistName: string,
   itemName: string,
   checked = false,
 ): Promise<Checklist> {
@@ -240,7 +231,7 @@ async function createStatusChecklistWithItem(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      name: STATUS_CHECKLIST_NAME,
+      name: checklistName,
     }),
   });
 
@@ -271,12 +262,12 @@ async function updateCheckItemState(
 async function ensureSingleNamedItem(
   checklist: Checklist,
   itemName: string,
+  checkedWhenCreated = false,
 ): Promise<boolean> {
   const matchingItems = findItemsByName(checklist, itemName);
 
   if (matchingItems.length === 0) {
-    await createCheckItem(checklist.id, itemName, false);
-
+    await createCheckItem(checklist.id, itemName, checkedWhenCreated);
     return true;
   }
 
@@ -284,19 +275,13 @@ async function ensureSingleNamedItem(
     return false;
   }
 
-  /*
-   * Keep a completed item when possible so user progress is not
-   * lost while duplicate items are cleaned up.
-   */
   const itemToKeep =
     matchingItems.find((item) => item.state === "complete") ?? matchingItems[0];
 
   for (const item of matchingItems) {
-    if (item.id === itemToKeep.id) {
-      continue;
+    if (item.id !== itemToKeep.id) {
+      await deleteCheckItem(checklist.id, item.id);
     }
-
-    await deleteCheckItem(checklist.id, item.id);
   }
 
   return true;
@@ -315,11 +300,11 @@ async function removeItemsByName(
   return matchingItems.length > 0;
 }
 
-async function deleteOtherStatusChecklists(
-  statusChecklists: Checklist[],
+async function deleteOtherChecklists(
+  checklists: Checklist[],
   keepChecklistIds: Set<string>,
 ): Promise<boolean> {
-  const checklistsToDelete = statusChecklists.filter(
+  const checklistsToDelete = checklists.filter(
     (checklist) => !keepChecklistIds.has(checklist.id),
   );
 
@@ -332,62 +317,51 @@ async function deleteOtherStatusChecklists(
 
 async function ensureNormalOrderWorkflow(
   cardId: string,
-  statusChecklists: Checklist[],
+  allChecklists: Checklist[],
 ): Promise<boolean> {
   let changed = false;
 
-  /*
-   * Prefer a Status checklist containing a completed Done item.
-   */
-  let checklistToKeep = chooseChecklistPreferCompleted(
-    statusChecklists.filter(hasDoneItem),
+  const statusChecklists = allChecklists.filter(isStatusChecklist);
+  const initialCommitmentChecklists = allChecklists.filter(
+    isInitialCommitmentChecklist,
+  );
+
+  let statusChecklist = chooseChecklistPreferCompleted(
+    statusChecklists.filter((checklist) => hasItem(checklist, DONE_ITEM_NAME)),
     DONE_ITEM_NAME,
   );
 
-  /*
-   * If none contains Done, keep one existing Status checklist.
-   */
-  if (!checklistToKeep) {
-    checklistToKeep = [...statusChecklists].sort((a, b) =>
+  if (!statusChecklist) {
+    statusChecklist = [...statusChecklists].sort((a, b) =>
       a.id.localeCompare(b.id),
     )[0];
   }
 
-  /*
-   * Create a Status checklist if none exists.
-   */
-  if (!checklistToKeep) {
-    checklistToKeep = await createStatusChecklistWithItem(
+  if (!statusChecklist) {
+    statusChecklist = await createChecklistWithItem(
       cardId,
+      STATUS_CHECKLIST_NAME,
       DONE_ITEM_NAME,
     );
-
     changed = true;
   }
 
-  /*
-   * Normal orders must have exactly one Status checklist.
-   */
-  const removedDuplicates = await deleteOtherStatusChecklists(
-    statusChecklists,
-    new Set([checklistToKeep.id]),
-  );
-
-  if (removedDuplicates) {
+  if (
+    await deleteOtherChecklists(statusChecklists, new Set([statusChecklist.id]))
+  ) {
     changed = true;
   }
 
-  /*
-   * The remaining checklist must contain exactly one Done item.
-   */
-  if (await ensureSingleNamedItem(checklistToKeep, DONE_ITEM_NAME)) {
+  if (await ensureSingleNamedItem(statusChecklist, DONE_ITEM_NAME)) {
     changed = true;
   }
 
-  /*
-   * Normal orders must not retain Initial release completed.
-   */
-  if (await removeItemsByName(checklistToKeep, INITIAL_RELEASE_ITEM_NAME)) {
+  if (await removeItemsByName(statusChecklist, INITIAL_RELEASE_ITEM_NAME)) {
+    changed = true;
+  }
+
+  /* Complete orders must not retain Initial Commitment. */
+  if (await deleteOtherChecklists(initialCommitmentChecklists, new Set())) {
     changed = true;
   }
 
@@ -396,108 +370,92 @@ async function ensureNormalOrderWorkflow(
 
 async function ensurePartialOrderWorkflow(
   cardId: string,
-  statusChecklists: Checklist[],
+  allChecklists: Checklist[],
 ): Promise<boolean> {
   let changed = false;
 
-  /*
-   * Preserve completed states before cleanup.
-   */
-  const hadCompletedDone = statusChecklists.some(hasCompletedDone);
-
-  const hadCompletedInitialRelease = statusChecklists.some(
-    hasCompletedInitialRelease,
+  const statusChecklists = allChecklists.filter(isStatusChecklist);
+  const initialCommitmentChecklists = allChecklists.filter(
+    isInitialCommitmentChecklist,
   );
 
   /*
-   * Select the Status checklist containing
-   * Initial release completed.
+   * Preserve completion from either the current structure or the old
+   * legacy structure where Initial Release Completed was inside Status.
    */
-  let initialReleaseChecklist = chooseChecklistPreferCompleted(
-    statusChecklists.filter(hasInitialReleaseItem),
-    INITIAL_RELEASE_ITEM_NAME,
+  const hadCompletedInitialRelease = allChecklists.some((checklist) =>
+    hasCompletedItem(checklist, INITIAL_RELEASE_ITEM_NAME),
   );
 
-  if (!initialReleaseChecklist) {
-    initialReleaseChecklist = await createStatusChecklistWithItem(
-      cardId,
-      INITIAL_RELEASE_ITEM_NAME,
-      hadCompletedInitialRelease,
-    );
-
-    changed = true;
-  }
-
-  /*
-   * Select a separate Status checklist containing Done.
-   */
-  const doneChecklistCandidates = statusChecklists.filter(
-    (checklist) =>
-      checklist.id !== initialReleaseChecklist.id && hasDoneItem(checklist),
-  );
-
-  let doneChecklist = chooseChecklistPreferCompleted(
-    doneChecklistCandidates,
+  let statusChecklist = chooseChecklistPreferCompleted(
+    statusChecklists.filter((checklist) => hasItem(checklist, DONE_ITEM_NAME)),
     DONE_ITEM_NAME,
   );
 
-  if (!doneChecklist) {
-    doneChecklist = await createStatusChecklistWithItem(
-      cardId,
-      DONE_ITEM_NAME,
-      hadCompletedDone,
-    );
+  if (!statusChecklist) {
+    statusChecklist = [...statusChecklists].sort((a, b) =>
+      a.id.localeCompare(b.id),
+    )[0];
+  }
 
+  if (!statusChecklist) {
+    statusChecklist = await createChecklistWithItem(
+      cardId,
+      STATUS_CHECKLIST_NAME,
+      DONE_ITEM_NAME,
+    );
     changed = true;
   }
 
-  /*
-   * Partial orders must have exactly two Status checklists:
-   *
-   * 1. Done
-   * 2. Initial release completed
-   */
-  const removedDuplicates = await deleteOtherStatusChecklists(
-    statusChecklists,
-    new Set([doneChecklist.id, initialReleaseChecklist.id]),
+  let initialCommitmentChecklist = chooseChecklistPreferCompleted(
+    initialCommitmentChecklists,
+    INITIAL_RELEASE_ITEM_NAME,
   );
 
-  if (removedDuplicates) {
-    changed = true;
-  }
-
-  /*
-   * Done checklist:
-   * exactly one Done item.
-   */
-  if (await ensureSingleNamedItem(doneChecklist, DONE_ITEM_NAME)) {
-    changed = true;
-  }
-
-  /*
-   * Done checklist must not contain Initial release completed.
-   */
-  if (await removeItemsByName(doneChecklist, INITIAL_RELEASE_ITEM_NAME)) {
-    changed = true;
-  }
-
-  /*
-   * Initial-release checklist:
-   * exactly one Initial release completed item.
-   */
-  if (
-    await ensureSingleNamedItem(
-      initialReleaseChecklist,
+  if (!initialCommitmentChecklist) {
+    initialCommitmentChecklist = await createChecklistWithItem(
+      cardId,
+      INITIAL_COMMITMENT_CHECKLIST_NAME,
       INITIAL_RELEASE_ITEM_NAME,
+      hadCompletedInitialRelease,
+    );
+    changed = true;
+  }
+
+  if (
+    await deleteOtherChecklists(statusChecklists, new Set([statusChecklist.id]))
+  ) {
+    changed = true;
+  }
+
+  if (
+    await deleteOtherChecklists(
+      initialCommitmentChecklists,
+      new Set([initialCommitmentChecklist.id]),
     )
   ) {
     changed = true;
   }
 
-  /*
-   * Initial-release checklist must not contain Done.
-   */
-  if (await removeItemsByName(initialReleaseChecklist, DONE_ITEM_NAME)) {
+  if (await ensureSingleNamedItem(statusChecklist, DONE_ITEM_NAME)) {
+    changed = true;
+  }
+
+  if (await removeItemsByName(statusChecklist, INITIAL_RELEASE_ITEM_NAME)) {
+    changed = true;
+  }
+
+  if (
+    await ensureSingleNamedItem(
+      initialCommitmentChecklist,
+      INITIAL_RELEASE_ITEM_NAME,
+      hadCompletedInitialRelease,
+    )
+  ) {
+    changed = true;
+  }
+
+  if (await removeItemsByName(initialCommitmentChecklist, DONE_ITEM_NAME)) {
     changed = true;
   }
 
@@ -507,93 +465,44 @@ async function ensurePartialOrderWorkflow(
 async function ensureWorkflowChecklists(
   card: TrelloCard,
 ): Promise<EnsureWorkflowResult> {
-  const cardId = card.id;
   const partialOrder = isPartialOrder(card);
-
   let changed = false;
 
-  let checklists = await getCardChecklists(cardId);
+  /* Normalize twice to protect against overlapping webhook requests. */
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const allChecklists = await getCardChecklists(card.id);
 
-  let statusChecklists = checklists.filter(isStatusChecklist);
-
-  /*
-   * Create the first Status checklist when the card has none.
-   *
-   * For partial orders, ensurePartialOrderWorkflow will then create
-   * the second checklist for Initial release completed.
-   */
-  if (statusChecklists.length === 0) {
-    await createStatusChecklistWithItem(cardId, DONE_ITEM_NAME);
-
-    changed = true;
-
-    checklists = await getCardChecklists(cardId);
-
-    statusChecklists = checklists.filter(isStatusChecklist);
-  }
-
-  if (statusChecklists.length === 0) {
-    throw new Error(`Status checklist could not be created for card ${cardId}`);
-  }
-
-  /*
-   * Partial Order label is the authoritative indicator.
-   */
-  if (partialOrder) {
-    const workflowChanged = await ensurePartialOrderWorkflow(
-      cardId,
-      statusChecklists,
-    );
-
-    if (workflowChanged) {
-      changed = true;
-    }
-  } else {
-    const workflowChanged = await ensureNormalOrderWorkflow(
-      cardId,
-      statusChecklists,
-    );
+    const workflowChanged = partialOrder
+      ? await ensurePartialOrderWorkflow(card.id, allChecklists)
+      : await ensureNormalOrderWorkflow(card.id, allChecklists);
 
     if (workflowChanged) {
       changed = true;
     }
   }
 
-  /*
-   * Refetch after cleanup because another webhook request may have
-   * changed the checklists at the same time.
-   */
-  const verifiedChecklists = await getCardChecklists(cardId);
+  const finalChecklists = await getCardChecklists(card.id);
+  const finalStatusChecklists = finalChecklists.filter(isStatusChecklist);
+  const finalInitialCommitmentChecklists = finalChecklists.filter(
+    isInitialCommitmentChecklist,
+  );
 
-  const verifiedStatusChecklists = verifiedChecklists.filter(isStatusChecklist);
-
-  if (verifiedStatusChecklists.length === 0) {
+  if (finalStatusChecklists.length !== 1) {
     throw new Error(
-      `Status checklist disappeared while processing card ${cardId}`,
+      `Expected exactly one Status checklist for card ${card.id}`,
     );
   }
 
-  /*
-   * Run the same normalization once more against the verified state.
-   */
-  if (partialOrder) {
-    const finalChanged = await ensurePartialOrderWorkflow(
-      cardId,
-      verifiedStatusChecklists,
+  if (partialOrder && finalInitialCommitmentChecklists.length !== 1) {
+    throw new Error(
+      `Expected exactly one Initial Commitment checklist for partial card ${card.id}`,
     );
+  }
 
-    if (finalChanged) {
-      changed = true;
-    }
-  } else {
-    const finalChanged = await ensureNormalOrderWorkflow(
-      cardId,
-      verifiedStatusChecklists,
+  if (!partialOrder && finalInitialCommitmentChecklists.length !== 0) {
+    throw new Error(
+      `Complete card ${card.id} still has an Initial Commitment checklist`,
     );
-
-    if (finalChanged) {
-      changed = true;
-    }
   }
 
   return {
@@ -605,11 +514,7 @@ async function ensureWorkflowChecklists(
 async function cardChecklistDone(cardId: string): Promise<boolean> {
   const checklists = await getCardChecklists(cardId);
 
-  /*
-   * Only the exact item Done triggers station movement.
-   *
-   * Initial release completed never triggers station movement.
-   */
+  /* Only Status -> Done triggers station movement. */
   return checklists.some(
     (checklist) =>
       isStatusChecklist(checklist) &&
@@ -648,10 +553,6 @@ async function restoreCompletedDoneItems(
     try {
       await updateCheckItemState(cardId, checkItemId, "complete");
     } catch (error) {
-      /*
-       * A concurrent cleanup request may have deleted an item.
-       * Do not hide the original move error.
-       */
       console.error(
         `Could not restore Done item ${checkItemId} for card ${cardId}:`,
         error,
@@ -717,28 +618,15 @@ export async function POST() {
         continue;
       }
 
-      /*
-       * Keep a mutable count so multiple cards moved during this
-       * request cannot exceed the next station's WIP limit.
-       */
       let nextListCount = nextList.cards?.length ?? 0;
 
       for (const snapshotCard of list.cards ?? []) {
-        /*
-         * The board response is only a snapshot.
-         *
-         * Another webhook request may already have moved the card.
-         */
         const currentCard = await getCurrentCard(snapshotCard.id);
 
         if (currentCard.idList !== list.id) {
           continue;
         }
 
-        /*
-         * Normalize checklist structure based on the Partial Order
-         * label.
-         */
         const workflowResult = await ensureWorkflowChecklists(currentCard);
 
         if (workflowResult.changed) {
@@ -748,13 +636,7 @@ export async function POST() {
             partialOrder: workflowResult.partialOrder,
           });
 
-          /*
-           * Do not move a card during the same request that repaired
-           * or normalized its checklists.
-           *
-           * The checklist changes will trigger another webhook, which
-           * can evaluate the final stable state.
-           */
+          /* Evaluate movement on the next stable webhook request. */
           continue;
         }
 
@@ -764,10 +646,6 @@ export async function POST() {
           continue;
         }
 
-        /*
-         * Recheck the card's current station after reading the
-         * checklist.
-         */
         const cardBeforeMove = await getCurrentCard(currentCard.id);
 
         if (cardBeforeMove.idList !== list.id) {
@@ -796,30 +674,14 @@ export async function POST() {
         }
 
         /*
-         * Reset Done before moving the card.
-         *
-         * This prevents a list-move webhook from seeing the card in
-         * the next station while Done is still checked.
-         *
-         * Initial release completed is never reset.
+         * Reset Done before moving to prevent cascading moves.
+         * Initial Release Completed is never reset.
          */
         const resetDoneItemIds = await resetCompletedDoneItems(currentCard.id);
 
-        /*
-         * Verify the card again after resetting Done.
-         *
-         * Another webhook request may have moved it while this request
-         * was processing.
-         */
         const verifiedCard = await getCurrentCard(currentCard.id);
 
         if (verifiedCard.idList !== list.id) {
-          /*
-           * Another request already moved the card.
-           *
-           * Do not restore Done because the completed state has
-           * already been consumed by the successful move.
-           */
           continue;
         }
 
@@ -835,12 +697,7 @@ export async function POST() {
             }),
           });
         } catch (error) {
-          /*
-           * Restore Done if Trello fails to move the card so the user
-           * does not lose the completed action.
-           */
           await restoreCompletedDoneItems(currentCard.id, resetDoneItemIds);
-
           throw error;
         }
 
