@@ -881,13 +881,9 @@ STATUS: Production Details Complete
     await addLabelToCard(cardId, priorityLabelId, key, token);
 
     /*
-     * Add Partial Order for partial releases and remove it
-     * when the order is changed back to Complete.
-     */
-    await syncPartialOrderLabel(cardId, deliveryStrategy, key, token, boardId);
-
-    /*
-     * Normal:
+     * Normalize workflow checklists first.
+     *
+     * Complete:
      * Status -> Done
      *
      * Partial:
@@ -895,6 +891,13 @@ STATUS: Production Details Complete
      * Initial Commitment -> Initial Release Completed
      */
     await syncProductionChecklists(cardId, deliveryStrategy, key, token);
+
+    /*
+     * Sync the Partial Order label after the checklist workflow.
+     *
+     * This prevents a label API failure from stopping checklist creation.
+     */
+    await syncPartialOrderLabel(cardId, deliveryStrategy, key, token, boardId);
 
     return NextResponse.json({
       success: true,

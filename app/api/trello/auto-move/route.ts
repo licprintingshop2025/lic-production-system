@@ -16,6 +16,7 @@ type TrelloCard = {
   id: string;
   name: string;
   idList: string;
+  desc?: string;
   labels?: TrelloLabel[];
 };
 
@@ -121,11 +122,15 @@ function getNextStation(currentStation: string): string | null {
 }
 
 function isPartialOrder(card: TrelloCard): boolean {
-  return (
+  const hasPartialOrderLabel =
     card.labels?.some(
       (label) => normalize(label.name) === normalize(PARTIAL_ORDER_LABEL_NAME),
-    ) ?? false
-  );
+    ) ?? false;
+
+  const hasPartialReleaseDescription =
+    /DELIVERY STRATEGY:\s*PARTIAL RELEASE/i.test(card.desc || "");
+
+  return hasPartialOrderLabel || hasPartialReleaseDescription;
 }
 
 function isStatusChecklist(checklist: Checklist): boolean {
@@ -180,7 +185,7 @@ async function getCardChecklists(cardId: string): Promise<Checklist[]> {
 
 async function getCurrentCard(cardId: string): Promise<TrelloCard> {
   return trelloFetch<TrelloCard>(
-    `cards/${cardId}?fields=id,name,idList,labels&label_fields=name`,
+    `cards/${cardId}?fields=id,name,idList,desc,labels&label_fields=name`,
   );
 }
 
