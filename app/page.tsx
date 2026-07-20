@@ -1,6 +1,7 @@
 import AppShell from "./components/AppShell";
 import PageHeader from "./components/PageHeader";
 import ProductionSyncRunner from "./components/ProductionSyncRunner";
+import { requireSiteAuth } from "@/lib/siteAuth";
 
 import {
   formatProductionVolume,
@@ -89,6 +90,8 @@ function isWithinLast7Days(dateString?: string) {
 }
 
 export default async function Home() {
+  await requireSiteAuth();
+
   const lists = await getLists();
   const trackerRows = await getTrackerRows();
 
@@ -334,11 +337,10 @@ export default async function Home() {
 
                     <td className="p-4">
                       <span
-                        className={`rounded-md px-3 py-1 text-xs font-bold ${
-                          row.orderPriority === "Rush"
+                        className={`rounded-md px-3 py-1 text-xs font-bold ${row.orderPriority === "Rush"
                             ? "bg-red-100 text-red-700"
                             : "bg-blue-100 text-blue-700"
-                        }`}
+                          }`}
                       >
                         {row.orderPriority}
                       </span>

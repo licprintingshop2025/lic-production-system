@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type NavItemProps = {
@@ -134,18 +134,16 @@ function MobileSidebar({
 }) {
   return (
     <div
-      className={`fixed inset-0 z-50 lg:hidden ${
-        open ? "pointer-events-auto" : "pointer-events-none"
-      }`}
+      className={`fixed inset-0 z-50 lg:hidden ${open ? "pointer-events-auto" : "pointer-events-none"
+        }`}
       aria-hidden={!open}
     >
       <button
         type="button"
         aria-label="Close navigation menu"
         onClick={onClose}
-        className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${
-          open ? "opacity-100" : "opacity-0"
-        }`}
+        className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0"
+          }`}
       />
 
       <aside
@@ -153,9 +151,8 @@ function MobileSidebar({
         role="dialog"
         aria-modal="true"
         aria-label="Mobile navigation"
-        className={`absolute inset-y-0 left-0 flex w-[min(86vw,320px)] flex-col border-r border-[#e3d8c7] bg-[#fffaf2] shadow-2xl transition-transform duration-300 ease-out ${
-          open ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`absolute inset-y-0 left-0 flex w-[min(86vw,320px)] flex-col border-r border-[#e3d8c7] bg-[#fffaf2] shadow-2xl transition-transform duration-300 ease-out ${open ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <div className="flex items-center justify-between border-b border-[#e3d8c7] px-4 py-3">
           <p className="text-sm font-black uppercase tracking-wide text-[#6b421f]">
@@ -266,6 +263,10 @@ function SidebarContent({
           onClick={onNavigate}
         />
       </nav>
+
+      <div className="shrink-0 border-t border-[#e3d8c7] p-4">
+        <LogoutButton />
+      </div>
     </>
   );
 }
@@ -276,14 +277,65 @@ function NavItem({ label, href, active = false, onClick }: NavItemProps) {
       href={href}
       onClick={onClick}
       aria-current={active ? "page" : undefined}
-      className={`block rounded-lg px-5 py-4 text-sm transition ${
-        active
+      className={`block rounded-lg px-5 py-4 text-sm transition ${active
           ? "bg-[#f3dfbf] font-black text-black"
           : "font-medium text-black hover:bg-[#f7ead6]"
-      }`}
+        }`}
     >
       {label}
     </a>
+  );
+}
+
+function LogoutButton() {
+  const router = useRouter();
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleLogout() {
+    if (loggingOut) {
+      return;
+    }
+
+    setLoggingOut(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/logout", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Logout request failed.");
+      }
+
+      router.replace("/login");
+      router.refresh();
+    } catch (logoutError) {
+      console.error("Logout error:", logoutError);
+      setError("Unable to log out. Please try again.");
+      setLoggingOut(false);
+    }
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={handleLogout}
+        disabled={loggingOut}
+        className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-5 py-3.5 text-sm font-black text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <LogoutIcon />
+        {loggingOut ? "Logging out..." : "Logout"}
+      </button>
+
+      {error && (
+        <p className="mt-2 text-center text-xs font-semibold text-red-600">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -318,6 +370,25 @@ function CloseIcon() {
     >
       <path d="M6 6l12 12" />
       <path d="M18 6L6 18" />
+    </svg>
+  );
+}
+
+function LogoutIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M10 17l5-5-5-5" />
+      <path d="M15 12H3" />
+      <path d="M15 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" />
     </svg>
   );
 }
