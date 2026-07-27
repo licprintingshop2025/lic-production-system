@@ -14,7 +14,9 @@ import {
 } from "@/lib/trelloWorkflow";
 
 type RouteContext = {
-  params: Promise<{ cardId: string }>;
+  params: Promise<{
+    cardId: string;
+  }>;
 };
 
 type TrelloLabel = {
@@ -49,24 +51,59 @@ type Checklist = {
   checkItems: ChecklistItem[];
 };
 
-type ProductionDetailsPayload = {
+type DocumentSpecificationPayload = {
+  id: string;
+  documentType: string;
+  quantity?: string;
+  serialRange?: string;
   paperType: string;
   ply: string;
   size: string;
-  orderPriority: string;
   specialInstructions?: string;
+};
+
+type ProductionDetailsPayload = {
+  orderPriority: string;
 
   deliveryStrategy: DeliveryStrategy;
   initialReleaseQty?: string;
   initialDueWorkingDays?: string;
   finalDueWorkingDays?: string;
+
+  documents: DocumentSpecificationPayload[];
 };
 
-const PRODUCTION_START_LIST = "Station 1 & 2 (Layouting & Encoding)";
+type SourceOrderData = {
+  trackingNo: string;
+  tradeName: string;
+  ocn: string;
+  tin: string;
+  rdo: string;
+  documentType: string;
+  taxType: string;
+  atp: string;
+  qty: string;
+  serial: string;
+  isNonBir: boolean;
+};
+
+const PRODUCTION_START_LIST =
+  "Station 1 & 2 (Layouting & Encoding)";
+
+const DOCUMENT_SPECIFICATIONS_START =
+  "DOCUMENT SPECIFICATIONS START";
+
+const DOCUMENT_SPECIFICATIONS_END =
+  "DOCUMENT SPECIFICATIONS END";
 
 function value(data: unknown) {
-  const text = String(data || "").trim();
+  const text = String(data ?? "").trim();
+
   return text || "-";
+}
+
+function textValue(data: unknown) {
+  return String(data ?? "").trim();
 }
 
 function normalize(text: string | undefined) {
@@ -77,6 +114,7 @@ function normalize(text: string | undefined) {
 
 function isWeekend(date: Date) {
   const day = date.getDay();
+
   return day === 0 || day === 6;
 }
 
@@ -99,23 +137,35 @@ function formatDateOnly(date: Date) {
   return date.toISOString().split("T")[0];
 }
 
-function findFirstMoveInto(actions: TrelloAction[], listName: string) {
+function findFirstMoveInto(
+  actions: TrelloAction[],
+  listName: string,
+) {
   const sorted = [...actions].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    (a, b) =>
+      new Date(a.date).getTime() -
+      new Date(b.date).getTime(),
   );
 
   const action = sorted.find(
-    (item) => normalize(item.data.listAfter?.name) === normalize(listName),
+    (item) =>
+      normalize(item.data.listAfter?.name) ===
+      normalize(listName),
   );
 
   return action?.date || "";
 }
 
 function getDeliveryLabel(strategy: DeliveryStrategy) {
-  return strategy === "PARTIAL" ? "Partial Release" : "Complete Order";
+  return strategy === "PARTIAL"
+    ? "Partial Release"
+    : "Complete Order";
 }
 
-function toPositiveNumber(input: string | undefined, fallback: number) {
+function toPositiveNumber(
+  input: string | undefined,
+  fallback: number,
+) {
   const number = Number(input);
 
   if (!Number.isFinite(number) || number <= 0) {
@@ -125,17 +175,94 @@ function toPositiveNumber(input: string | undefined, fallback: number) {
   return number;
 }
 
-function isStatusChecklist(checklist: Checklist) {
-  return normalize(checklist.name) === normalize(STATUS_CHECKLIST_NAME);
+function extractDescriptionValue(
+  description: string,
+  fieldName: string,
+) {
+  const escapedFieldName = fieldName.replace(
+    /[.*+?^${}()|[\]\\]/g,
+    "\\$&",
+  );
+
+  const match = description.match(
+    new RegExp(`^${escapedFieldName}:\\s*(.*)$`, "im"),
+  );
+
+  return match?.[1]?.trim() || "";
 }
 
-function findItemsByName(checklist: Checklist, itemName: string) {
-  return checklist.checkItems.filter(
-    (item) => normalize(item.name) === normalize(itemName),
+function cleanStoredValue(input: string) {
+  const cleaned = textValue(input);
+
+  if (!cleaned || cleaned === "-") {
+    return "";
+  }
+
+  return cleaned;
+}
+
+function splitOrderValues(input: string) {
+  const cleaned = textValue(input);
+
+  if (!cleaned || cleaned === "-") {
+    return [];
+  }
+
+  return cleaned
+    .split(/\s*(?:\r?\n|\||;|\/)\s*/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function createDocumentId(
+  documentType: string,
+  index: number,
+) {
+  const slug = documentType
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+
+  return `${slug || "document"}-${index + 1}`;
+}
+
+function sanitizeDescriptionLine(input: unknown) {
+  const cleaned = textValue(input).replace(/\r?\n+/g, " ");
+
+  return cleaned || "-";
+}
+
+function isStatusChecklist(checklist: Checklist) {
+  return (
+    normalize(checklist.name) ===
+    normalize(STATUS_CHECKLIST_NAME)
   );
 }
 
-function hasItem(checklist: Checklist, itemName: string) {
+function isInitialCommitmentChecklist(
+  checklist: Checklist,
+) {
+  return (
+    normalize(checklist.name) ===
+    normalize(INITIAL_COMMITMENT_CHECKLIST_NAME)
+  );
+}
+
+function findItemsByName(
+  checklist: Checklist,
+  itemName: string,
+) {
+  return checklist.checkItems.filter(
+    (item) =>
+      normalize(item.name) === normalize(itemName),
+  );
+}
+
+function hasItem(
+  checklist: Checklist,
+  itemName: string,
+) {
   return findItemsByName(checklist, itemName).length > 0;
 }
 
@@ -143,17 +270,20 @@ function chooseChecklistPreferCompleted(
   checklists: Checklist[],
   itemName: string,
 ) {
-  const completedChecklist = checklists.find((checklist) =>
-    findItemsByName(checklist, itemName).some(
-      (item) => item.state === "complete",
-    ),
+  const completedChecklist = checklists.find(
+    (checklist) =>
+      findItemsByName(checklist, itemName).some(
+        (item) => item.state === "complete",
+      ),
   );
 
   if (completedChecklist) {
     return completedChecklist;
   }
 
-  return [...checklists].sort((a, b) => a.id.localeCompare(b.id))[0];
+  return [...checklists].sort((a, b) =>
+    a.id.localeCompare(b.id),
+  )[0];
 }
 
 async function trelloRequest<T>(
@@ -168,7 +298,9 @@ async function trelloRequest<T>(
   if (!response.ok) {
     const details = await response.text();
 
-    throw new Error(`Trello request failed (${response.status}): ${details}`);
+    throw new Error(
+      `Trello request failed (${response.status}): ${details}`,
+    );
   }
 
   if (response.status === 204) {
@@ -178,7 +310,11 @@ async function trelloRequest<T>(
   return (await response.json()) as T;
 }
 
-async function getCardMoveActions(cardId: string, key: string, token: string) {
+async function getCardMoveActions(
+  cardId: string,
+  key: string,
+  token: string,
+) {
   const response = await fetch(
     `https://api.trello.com/1/cards/${cardId}/actions?filter=updateCard:idList&key=${key}&token=${token}`,
     {
@@ -193,13 +329,21 @@ async function getCardMoveActions(cardId: string, key: string, token: string) {
   return (await response.json()) as TrelloAction[];
 }
 
-async function getBoardLabels(key: string, token: string, boardId: string) {
+async function getBoardLabels(
+  key: string,
+  token: string,
+  boardId: string,
+) {
   return trelloRequest<TrelloLabel[]>(
     `https://api.trello.com/1/boards/${boardId}/labels?key=${key}&token=${token}`,
   );
 }
 
-async function getCardLabels(cardId: string, key: string, token: string) {
+async function getCardLabels(
+  cardId: string,
+  key: string,
+  token: string,
+) {
   return trelloRequest<TrelloLabel[]>(
     `https://api.trello.com/1/cards/${cardId}/labels?key=${key}&token=${token}`,
   );
@@ -235,10 +379,15 @@ async function getOrCreateLabel(
   labelName: string,
   labelColor: string,
 ) {
-  const labels = await getBoardLabels(key, token, boardId);
+  const labels = await getBoardLabels(
+    key,
+    token,
+    boardId,
+  );
 
   const existingLabel = labels.find(
-    (label) => normalize(label.name) === normalize(labelName),
+    (label) =>
+      normalize(label.name) === normalize(labelName),
   );
 
   if (existingLabel) {
@@ -262,7 +411,8 @@ async function getOrCreatePriorityLabel(
   boardId: string,
   priority: string,
 ) {
-  const isRush = priority.trim().toLowerCase() === "rush";
+  const isRush =
+    priority.trim().toLowerCase() === "rush";
 
   return getOrCreateLabel(
     key,
@@ -310,16 +460,20 @@ async function addLabelToCard(
     return;
   }
 
-  /*
-   * Some overlapping requests may try to add the same label.
-   * Verify the final card state before reporting a failure.
-   */
-  const currentLabels = await getCardLabels(cardId, key, token);
+  const currentLabels = await getCardLabels(
+    cardId,
+    key,
+    token,
+  );
 
-  const alreadyAttached = currentLabels.some((label) => label.id === labelId);
+  const alreadyAttached = currentLabels.some(
+    (label) => label.id === labelId,
+  );
 
   if (!alreadyAttached) {
-    throw new Error(`Failed to add Trello label: ${await response.text()}`);
+    throw new Error(
+      `Failed to add Trello label: ${await response.text()}`,
+    );
   }
 }
 
@@ -337,7 +491,9 @@ async function removeLabelFromCard(
   );
 
   if (!response.ok && response.status !== 404) {
-    throw new Error(`Failed to remove Trello label: ${await response.text()}`);
+    throw new Error(
+      `Failed to remove Trello label: ${await response.text()}`,
+    );
   }
 }
 
@@ -346,7 +502,11 @@ async function removeOldPriorityLabels(
   key: string,
   token: string,
 ) {
-  const labels = await getCardLabels(cardId, key, token);
+  const labels = await getCardLabels(
+    cardId,
+    key,
+    token,
+  );
 
   const priorityLabels = labels.filter((label) => {
     const name = normalize(label.name);
@@ -355,7 +515,12 @@ async function removeOldPriorityLabels(
   });
 
   for (const label of priorityLabels) {
-    await removeLabelFromCard(cardId, label.id, key, token);
+    await removeLabelFromCard(
+      cardId,
+      label.id,
+      key,
+      token,
+    );
   }
 }
 
@@ -366,38 +531,63 @@ async function syncPartialOrderLabel(
   token: string,
   boardId: string,
 ) {
-  const cardLabels = await getCardLabels(cardId, key, token);
+  const cardLabels = await getCardLabels(
+    cardId,
+    key,
+    token,
+  );
 
   const attachedPartialLabels = cardLabels.filter(
-    (label) => normalize(label.name) === normalize(PARTIAL_ORDER_LABEL_NAME),
+    (label) =>
+      normalize(label.name) ===
+      normalize(PARTIAL_ORDER_LABEL_NAME),
   );
 
   if (deliveryStrategy === "PARTIAL") {
     const partialLabelId =
       attachedPartialLabels[0]?.id ||
-      (await getOrCreatePartialOrderLabel(key, token, boardId));
+      (await getOrCreatePartialOrderLabel(
+        key,
+        token,
+        boardId,
+      ));
 
-    await addLabelToCard(cardId, partialLabelId, key, token);
+    await addLabelToCard(
+      cardId,
+      partialLabelId,
+      key,
+      token,
+    );
 
-    /*
-     * Remove duplicate labels with the same Partial Order name.
-     */
-    for (const duplicateLabel of attachedPartialLabels.slice(1)) {
-      await removeLabelFromCard(cardId, duplicateLabel.id, key, token);
+    for (const duplicateLabel of attachedPartialLabels.slice(
+      1,
+    )) {
+      await removeLabelFromCard(
+        cardId,
+        duplicateLabel.id,
+        key,
+        token,
+      );
     }
 
     return;
   }
 
-  /*
-   * Complete orders must not retain Partial Order labels.
-   */
   for (const partialLabel of attachedPartialLabels) {
-    await removeLabelFromCard(cardId, partialLabel.id, key, token);
+    await removeLabelFromCard(
+      cardId,
+      partialLabel.id,
+      key,
+      token,
+    );
   }
 }
 
-async function getCardChecklists(cardId: string, key: string, token: string) {
+async function getCardChecklists(
+  cardId: string,
+  key: string,
+  token: string,
+) {
   return trelloRequest<Checklist[]>(
     `https://api.trello.com/1/cards/${cardId}/checklists?key=${key}&token=${token}`,
   );
@@ -413,8 +603,12 @@ async function createChecklist(
     `https://api.trello.com/1/cards/${cardId}/checklists?key=${key}&token=${token}`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: checklistName }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: checklistName,
+      }),
     },
   );
 }
@@ -430,8 +624,13 @@ async function createChecklistItem(
     `https://api.trello.com/1/checklists/${checklistId}/checkItems?key=${key}&token=${token}`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: itemName, checked }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: itemName,
+        checked,
+      }),
     },
   );
 }
@@ -444,7 +643,13 @@ async function createChecklistWithItem(
   token: string,
   checked = false,
 ) {
-  const checklist = await createChecklist(cardId, checklistName, key, token);
+  const checklist = await createChecklist(
+    cardId,
+    checklistName,
+    key,
+    token,
+  );
+
   const item = await createChecklistItem(
     checklist.id,
     itemName,
@@ -453,7 +658,10 @@ async function createChecklistWithItem(
     checked,
   );
 
-  return { ...checklist, checkItems: [item] };
+  return {
+    ...checklist,
+    checkItems: [item],
+  };
 }
 
 async function deleteChecklist(
@@ -463,7 +671,9 @@ async function deleteChecklist(
 ) {
   await trelloRequest<void>(
     `https://api.trello.com/1/checklists/${checklistId}?key=${key}&token=${token}`,
-    { method: "DELETE" },
+    {
+      method: "DELETE",
+    },
   );
 }
 
@@ -475,7 +685,9 @@ async function deleteChecklistItem(
 ) {
   await trelloRequest<void>(
     `https://api.trello.com/1/checklists/${checklistId}/checkItems/${itemId}?key=${key}&token=${token}`,
-    { method: "DELETE" },
+    {
+      method: "DELETE",
+    },
   );
 }
 
@@ -486,7 +698,10 @@ async function ensureSingleChecklistItem(
   token: string,
   checkedWhenCreated = false,
 ) {
-  const matchingItems = findItemsByName(checklist, itemName);
+  const matchingItems = findItemsByName(
+    checklist,
+    itemName,
+  );
 
   if (matchingItems.length === 0) {
     await createChecklistItem(
@@ -496,15 +711,23 @@ async function ensureSingleChecklistItem(
       token,
       checkedWhenCreated,
     );
+
     return;
   }
 
   const itemToKeep =
-    matchingItems.find((item) => item.state === "complete") ?? matchingItems[0];
+    matchingItems.find(
+      (item) => item.state === "complete",
+    ) ?? matchingItems[0];
 
   for (const item of matchingItems) {
     if (item.id !== itemToKeep.id) {
-      await deleteChecklistItem(checklist.id, item.id, key, token);
+      await deleteChecklistItem(
+        checklist.id,
+        item.id,
+        key,
+        token,
+      );
     }
   }
 }
@@ -515,8 +738,16 @@ async function removeChecklistItemsByName(
   key: string,
   token: string,
 ) {
-  for (const item of findItemsByName(checklist, itemName)) {
-    await deleteChecklistItem(checklist.id, item.id, key, token);
+  for (const item of findItemsByName(
+    checklist,
+    itemName,
+  )) {
+    await deleteChecklistItem(
+      checklist.id,
+      item.id,
+      key,
+      token,
+    );
   }
 }
 
@@ -528,15 +759,13 @@ async function deleteOtherChecklists(
 ) {
   for (const checklist of checklists) {
     if (!keepIds.has(checklist.id)) {
-      await deleteChecklist(checklist.id, key, token);
+      await deleteChecklist(
+        checklist.id,
+        key,
+        token,
+      );
     }
   }
-}
-
-function isInitialCommitmentChecklist(checklist: Checklist) {
-  return (
-    normalize(checklist.name) === normalize(INITIAL_COMMITMENT_CHECKLIST_NAME)
-  );
 }
 
 async function syncCompleteOrderChecklists(
@@ -545,13 +774,17 @@ async function syncCompleteOrderChecklists(
   key: string,
   token: string,
 ) {
-  const statusChecklists = allChecklists.filter(isStatusChecklist);
+  const statusChecklists =
+    allChecklists.filter(isStatusChecklist);
+
   const commitmentChecklists = allChecklists.filter(
     isInitialCommitmentChecklist,
   );
 
   let statusChecklist = chooseChecklistPreferCompleted(
-    statusChecklists.filter((checklist) => hasItem(checklist, DONE_ITEM_NAME)),
+    statusChecklists.filter((checklist) =>
+      hasItem(checklist, DONE_ITEM_NAME),
+    ),
     DONE_ITEM_NAME,
   );
 
@@ -576,7 +809,12 @@ async function syncCompleteOrderChecklists(
     token,
   );
 
-  await ensureSingleChecklistItem(statusChecklist, DONE_ITEM_NAME, key, token);
+  await ensureSingleChecklistItem(
+    statusChecklist,
+    DONE_ITEM_NAME,
+    key,
+    token,
+  );
 
   await removeChecklistItemsByName(
     statusChecklist,
@@ -585,7 +823,12 @@ async function syncCompleteOrderChecklists(
     token,
   );
 
-  await deleteOtherChecklists(commitmentChecklists, new Set(), key, token);
+  await deleteOtherChecklists(
+    commitmentChecklists,
+    new Set(),
+    key,
+    token,
+  );
 }
 
 async function syncPartialOrderChecklists(
@@ -594,19 +837,25 @@ async function syncPartialOrderChecklists(
   key: string,
   token: string,
 ) {
-  const statusChecklists = allChecklists.filter(isStatusChecklist);
+  const statusChecklists =
+    allChecklists.filter(isStatusChecklist);
+
   const commitmentChecklists = allChecklists.filter(
     isInitialCommitmentChecklist,
   );
 
-  const initialReleaseWasCompleted = allChecklists.some((checklist) =>
-    findItemsByName(checklist, INITIAL_RELEASE_ITEM_NAME).some(
-      (item) => item.state === "complete",
-    ),
-  );
+  const initialReleaseWasCompleted =
+    allChecklists.some((checklist) =>
+      findItemsByName(
+        checklist,
+        INITIAL_RELEASE_ITEM_NAME,
+      ).some((item) => item.state === "complete"),
+    );
 
   let statusChecklist = chooseChecklistPreferCompleted(
-    statusChecklists.filter((checklist) => hasItem(checklist, DONE_ITEM_NAME)),
+    statusChecklists.filter((checklist) =>
+      hasItem(checklist, DONE_ITEM_NAME),
+    ),
     DONE_ITEM_NAME,
   );
 
@@ -624,20 +873,22 @@ async function syncPartialOrderChecklists(
     );
   }
 
-  let commitmentChecklist = chooseChecklistPreferCompleted(
-    commitmentChecklists,
-    INITIAL_RELEASE_ITEM_NAME,
-  );
+  let commitmentChecklist =
+    chooseChecklistPreferCompleted(
+      commitmentChecklists,
+      INITIAL_RELEASE_ITEM_NAME,
+    );
 
   if (!commitmentChecklist) {
-    commitmentChecklist = await createChecklistWithItem(
-      cardId,
-      INITIAL_COMMITMENT_CHECKLIST_NAME,
-      INITIAL_RELEASE_ITEM_NAME,
-      key,
-      token,
-      initialReleaseWasCompleted,
-    );
+    commitmentChecklist =
+      await createChecklistWithItem(
+        cardId,
+        INITIAL_COMMITMENT_CHECKLIST_NAME,
+        INITIAL_RELEASE_ITEM_NAME,
+        key,
+        token,
+        initialReleaseWasCompleted,
+      );
   }
 
   await deleteOtherChecklists(
@@ -654,7 +905,12 @@ async function syncPartialOrderChecklists(
     token,
   );
 
-  await ensureSingleChecklistItem(statusChecklist, DONE_ITEM_NAME, key, token);
+  await ensureSingleChecklistItem(
+    statusChecklist,
+    DONE_ITEM_NAME,
+    key,
+    token,
+  );
 
   await removeChecklistItemsByName(
     statusChecklist,
@@ -686,31 +942,488 @@ async function syncProductionChecklists(
   token: string,
 ) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const allChecklists = await getCardChecklists(cardId, key, token);
+    const allChecklists = await getCardChecklists(
+      cardId,
+      key,
+      token,
+    );
 
     if (deliveryStrategy === "PARTIAL") {
-      await syncPartialOrderChecklists(cardId, allChecklists, key, token);
+      await syncPartialOrderChecklists(
+        cardId,
+        allChecklists,
+        key,
+        token,
+      );
     } else {
-      await syncCompleteOrderChecklists(cardId, allChecklists, key, token);
+      await syncCompleteOrderChecklists(
+        cardId,
+        allChecklists,
+        key,
+        token,
+      );
     }
   }
 }
 
-export async function PUT(req: Request, context: RouteContext) {
+async function loadSourceOrderData(
+  cardId: string,
+  card: TrelloCard,
+): Promise<SourceOrderData> {
+  const [birRecord, nonBirRecord] = await Promise.all([
+    findReceivedATPByCardId(cardId),
+    findNonBIROrderByCardId(cardId),
+  ]);
+
+  const birRow = birRecord?.row || [];
+  const nonBirRow = nonBirRecord?.row || [];
+
+  const cardName = String(card.name || "").toUpperCase();
+
+  const isNonBir =
+    Boolean(nonBirRecord) ||
+    cardName.includes("NON-BIR") ||
+    cardName.includes("NON BIR");
+
+  return {
+    isNonBir,
+
+    trackingNo: isNonBir
+      ? value(nonBirRow[0])
+      : value(birRow[1]),
+
+    tradeName: isNonBir
+      ? value(nonBirRow[2])
+      : value(birRow[6]),
+
+    ocn: isNonBir ? "-" : value(birRow[3]),
+
+    tin: isNonBir ? "-" : value(birRow[4]),
+
+    rdo: isNonBir ? "-" : value(birRow[8]),
+
+    documentType: isNonBir
+      ? value(nonBirRow[3])
+      : value(birRow[10]),
+
+    taxType: isNonBir
+      ? "NON-BIR"
+      : value(birRow[11]),
+
+    atp: isNonBir ? "-" : value(birRow[16]),
+
+    qty: isNonBir
+      ? value(nonBirRow[4])
+      : value(birRow[12]),
+
+    serial: isNonBir
+      ? value(nonBirRow[5])
+      : value(birRow[15]),
+  };
+}
+
+function buildSourceDocuments(
+  source: SourceOrderData,
+): DocumentSpecificationPayload[] {
+  const documentTypes = splitOrderValues(
+    source.documentType,
+  );
+
+  const quantities = splitOrderValues(source.qty);
+
+  const serialRanges = splitOrderValues(
+    source.serial,
+  );
+
+  const documentCount = Math.max(
+    documentTypes.length,
+    quantities.length,
+    serialRanges.length,
+    1,
+  );
+
+  return Array.from(
+    {
+      length: documentCount,
+    },
+    (_, index) => {
+      const documentType =
+        documentTypes[index] ||
+        (documentTypes.length === 1
+          ? documentTypes[0]
+          : `Document ${index + 1}`);
+
+      const quantity =
+        quantities[index] ||
+        (quantities.length === 1 &&
+        documentCount === 1
+          ? quantities[0]
+          : "");
+
+      const serialRange =
+        serialRanges[index] ||
+        (serialRanges.length === 1 &&
+        documentCount === 1
+          ? serialRanges[0]
+          : "");
+
+      return {
+        id: createDocumentId(documentType, index),
+        documentType,
+        quantity,
+        serialRange,
+        paperType: "",
+        ply: "",
+        size: "",
+        specialInstructions: "",
+      };
+    },
+  );
+}
+
+function buildDocumentSpecificationsSection(
+  documents: DocumentSpecificationPayload[],
+) {
+  const blocks = documents.map(
+    (document, index) => `
+DOCUMENT ${index + 1}
+ID: ${sanitizeDescriptionLine(document.id)}
+TYPE: ${sanitizeDescriptionLine(document.documentType)}
+QTY: ${sanitizeDescriptionLine(document.quantity)}
+SERIAL: ${sanitizeDescriptionLine(document.serialRange)}
+PAPER: ${sanitizeDescriptionLine(document.paperType)}
+PLY: ${sanitizeDescriptionLine(document.ply)}
+SIZE: ${sanitizeDescriptionLine(document.size)}
+SPECIAL: ${sanitizeDescriptionLine(
+      document.specialInstructions,
+    )}
+`.trim(),
+  );
+
+  return `
+${DOCUMENT_SPECIFICATIONS_START}
+
+${blocks.join("\n\n")}
+
+${DOCUMENT_SPECIFICATIONS_END}
+`.trim();
+}
+
+function parseDocumentSpecifications(
+  description: string,
+): DocumentSpecificationPayload[] {
+  const startIndex = description.indexOf(
+    DOCUMENT_SPECIFICATIONS_START,
+  );
+
+  const endIndex = description.indexOf(
+    DOCUMENT_SPECIFICATIONS_END,
+  );
+
+  if (
+    startIndex < 0 ||
+    endIndex < 0 ||
+    endIndex <= startIndex
+  ) {
+    return [];
+  }
+
+  const section = description.slice(
+    startIndex +
+      DOCUMENT_SPECIFICATIONS_START.length,
+    endIndex,
+  );
+
+  const blocks = section
+    .split(/(?=^DOCUMENT\s+\d+\s*$)/gim)
+    .map((block) => block.trim())
+    .filter((block) =>
+      /^DOCUMENT\s+\d+/i.test(block),
+    );
+
+  return blocks.map((block, index) => ({
+    id:
+      cleanStoredValue(
+        extractDescriptionValue(block, "ID"),
+      ) || `document-${index + 1}`,
+
+    documentType:
+      cleanStoredValue(
+        extractDescriptionValue(block, "TYPE"),
+      ) || `Document ${index + 1}`,
+
+    quantity: cleanStoredValue(
+      extractDescriptionValue(block, "QTY"),
+    ),
+
+    serialRange: cleanStoredValue(
+      extractDescriptionValue(block, "SERIAL"),
+    ),
+
+    paperType: cleanStoredValue(
+      extractDescriptionValue(block, "PAPER"),
+    ),
+
+    ply: cleanStoredValue(
+      extractDescriptionValue(block, "PLY"),
+    ),
+
+    size: cleanStoredValue(
+      extractDescriptionValue(block, "SIZE"),
+    ),
+
+    specialInstructions: cleanStoredValue(
+      extractDescriptionValue(block, "SPECIAL"),
+    ),
+  }));
+}
+
+function mergeSourceAndSavedDocuments(
+  sourceDocuments: DocumentSpecificationPayload[],
+  savedDocuments: DocumentSpecificationPayload[],
+) {
+  if (savedDocuments.length === 0) {
+    return sourceDocuments;
+  }
+
+  const matchedSavedIndexes = new Set<number>();
+
+  const mergedDocuments = sourceDocuments.map(
+    (sourceDocument, sourceIndex) => {
+      let savedIndex = savedDocuments.findIndex(
+        (document, index) =>
+          !matchedSavedIndexes.has(index) &&
+          document.id === sourceDocument.id,
+      );
+
+      if (savedIndex < 0) {
+        savedIndex = savedDocuments.findIndex(
+          (document, index) =>
+            !matchedSavedIndexes.has(index) &&
+            normalize(document.documentType) ===
+              normalize(
+                sourceDocument.documentType,
+              ),
+        );
+      }
+
+      if (savedIndex < 0) {
+        savedIndex = savedDocuments.findIndex(
+          (_document, index) =>
+            !matchedSavedIndexes.has(index) &&
+            index === sourceIndex,
+        );
+      }
+
+      if (savedIndex < 0) {
+        return sourceDocument;
+      }
+
+      matchedSavedIndexes.add(savedIndex);
+
+      const savedDocument =
+        savedDocuments[savedIndex];
+
+      return {
+        ...sourceDocument,
+
+        id:
+          savedDocument.id ||
+          sourceDocument.id,
+
+        documentType:
+          savedDocument.documentType ||
+          sourceDocument.documentType,
+
+        quantity:
+          savedDocument.quantity ||
+          sourceDocument.quantity,
+
+        serialRange:
+          savedDocument.serialRange ||
+          sourceDocument.serialRange,
+
+        paperType:
+          savedDocument.paperType || "",
+
+        ply: savedDocument.ply || "",
+
+        size: savedDocument.size || "",
+
+        specialInstructions:
+          savedDocument.specialInstructions || "",
+      };
+    },
+  );
+
+  const unmatchedSavedDocuments =
+    savedDocuments.filter(
+      (_document, index) =>
+        !matchedSavedIndexes.has(index),
+    );
+
+  return [
+    ...mergedDocuments,
+    ...unmatchedSavedDocuments,
+  ];
+}
+
+function summarizeDocumentField(
+  documents: DocumentSpecificationPayload[],
+  field: "paperType" | "ply" | "size",
+) {
+  const uniqueValues = Array.from(
+    new Set(
+      documents
+        .map((document) =>
+          textValue(document[field]),
+        )
+        .filter(Boolean),
+    ),
+  );
+
+  if (uniqueValues.length === 0) {
+    return "-";
+  }
+
+  if (uniqueValues.length === 1) {
+    return uniqueValues[0];
+  }
+
+  return "Mixed - See Document Specifications";
+}
+
+function validateDocuments(
+  documents: DocumentSpecificationPayload[],
+) {
+  if (
+    !Array.isArray(documents) ||
+    documents.length === 0
+  ) {
+    return "At least one document specification is required.";
+  }
+
+  for (
+    let index = 0;
+    index < documents.length;
+    index += 1
+  ) {
+    const document = documents[index];
+
+    const documentName =
+      textValue(document.documentType) ||
+      `Document ${index + 1}`;
+
+    if (!textValue(document.paperType)) {
+      return `Paper type is required for ${documentName}.`;
+    }
+
+    if (!textValue(document.ply)) {
+      return `Ply is required for ${documentName}.`;
+    }
+
+    if (!textValue(document.size)) {
+      return `Size is required for ${documentName}.`;
+    }
+  }
+
+  return "";
+}
+
+function normalizeDocuments(
+  documents: DocumentSpecificationPayload[],
+) {
+  return documents.map((document, index) => {
+    const documentType =
+      textValue(document.documentType) ||
+      `Document ${index + 1}`;
+
+    return {
+      id:
+        textValue(document.id) ||
+        createDocumentId(documentType, index),
+
+      documentType,
+
+      quantity: textValue(document.quantity),
+
+      serialRange: textValue(
+        document.serialRange,
+      ),
+
+      paperType: textValue(
+        document.paperType,
+      ),
+
+      ply: textValue(document.ply),
+
+      size: textValue(document.size),
+
+      specialInstructions: textValue(
+        document.specialInstructions,
+      ),
+    };
+  });
+}
+
+function parseSavedDeliveryStrategy(
+  description: string,
+): DeliveryStrategy {
+  const savedStrategy = extractDescriptionValue(
+    description,
+    "DELIVERY STRATEGY",
+  );
+
+  if (
+    normalize(savedStrategy) ===
+      normalize("Partial Release") ||
+    normalize(savedStrategy) === "PARTIAL"
+  ) {
+    return "PARTIAL";
+  }
+
+  return "COMPLETE";
+}
+
+function parseSavedNumberField(
+  description: string,
+  fieldName: string,
+  fallback: string,
+) {
+  const savedValue = cleanStoredValue(
+    extractDescriptionValue(
+      description,
+      fieldName,
+    ),
+  );
+
+  if (!savedValue) {
+    return fallback;
+  }
+
+  const numberOnly = savedValue.replace(
+    /\s*Booklets?$/i,
+    "",
+  );
+
+  return numberOnly || fallback;
+}
+
+export async function GET(
+  _req: Request,
+  context: RouteContext,
+) {
   try {
     const { cardId } = await context.params;
 
-    const body = (await req.json()) as ProductionDetailsPayload;
-
     const key = process.env.TRELLO_KEY;
     const token = process.env.TRELLO_TOKEN;
-    const boardId = process.env.TRELLO_BOARD_ID;
-    const station4ListId = process.env.TRELLO_STATION4_LIST_ID;
 
-    if (!key || !token || !boardId || !station4ListId) {
+    if (!key || !token) {
       return NextResponse.json(
         {
-          error: "Missing Trello environment variables.",
+          error:
+            "Missing Trello environment variables.",
         },
         {
           status: 500,
@@ -722,190 +1435,400 @@ export async function PUT(req: Request, context: RouteContext) {
       `https://api.trello.com/1/cards/${cardId}?fields=id,name,desc&key=${key}&token=${token}`,
     );
 
-    const birRecord = await findReceivedATPByCardId(cardId);
-
-    const nonBirRecord = await findNonBIROrderByCardId(cardId);
-
-    const birRow = birRecord?.row || [];
-    const nonBirRow = nonBirRecord?.row || [];
-
-    const cardName = String(card.name || "").toUpperCase();
-
-    const isNonBir =
-      Boolean(nonBirRecord) ||
-      cardName.includes("NON-BIR") ||
-      cardName.includes("NON BIR");
-
-    const trackingNo = isNonBir ? value(nonBirRow[0]) : value(birRow[1]);
-
-    const tradeName = isNonBir ? value(nonBirRow[2]) : value(birRow[6]);
-
-    const ocn = isNonBir ? "-" : value(birRow[3]);
-
-    const tin = isNonBir ? "-" : value(birRow[4]);
-
-    const rdo = isNonBir ? "-" : value(birRow[8]);
-
-    const documentType = isNonBir ? value(nonBirRow[3]) : value(birRow[10]);
-
-    const taxType = isNonBir ? "NON-BIR" : value(birRow[11]);
-
-    const atp = isNonBir ? "-" : value(birRow[16]);
-
-    const qty = isNonBir ? value(nonBirRow[4]) : value(birRow[12]);
-
-    const serial = isNonBir ? value(nonBirRow[5]) : value(birRow[15]);
-
-    const actions = await getCardMoveActions(cardId, key, token);
-
-    const productionStartRaw = findFirstMoveInto(
-      actions,
-      PRODUCTION_START_LIST,
+    const source = await loadSourceOrderData(
+      cardId,
+      card,
     );
 
-    const productionStartDate = productionStartRaw
-      ? new Date(productionStartRaw)
-      : null;
+    const sourceDocuments =
+      buildSourceDocuments(source);
+
+    const savedDocuments =
+      parseDocumentSpecifications(
+        card.desc || "",
+      );
+
+    const documents =
+      mergeSourceAndSavedDocuments(
+        sourceDocuments,
+        savedDocuments,
+      );
+
+    const description = card.desc || "";
+
+    return NextResponse.json({
+      cardId: card.id,
+      cardName: card.name,
+
+      sourceType: source.isNonBir
+        ? "NON_BIR"
+        : "BIR",
+
+      documents,
+
+      orderPriority: cleanStoredValue(
+        extractDescriptionValue(
+          description,
+          "PRIORITY",
+        ),
+      ),
+
+      deliveryStrategy:
+        parseSavedDeliveryStrategy(description),
+
+      initialReleaseQty:
+        parseSavedNumberField(
+          description,
+          "INITIAL RELEASE QTY",
+          "10",
+        ),
+
+      initialDueWorkingDays:
+        parseSavedNumberField(
+          description,
+          "INITIAL DUE WD",
+          "10",
+        ),
+
+      finalDueWorkingDays:
+        parseSavedNumberField(
+          description,
+          "FINAL DUE WD",
+          "30",
+        ),
+    });
+  } catch (error) {
+    console.error(
+      "GET production details error:",
+      error,
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to load production details.",
+      },
+      {
+        status: 500,
+      },
+    );
+  }
+}
+
+export async function PUT(
+  req: Request,
+  context: RouteContext,
+) {
+  try {
+    const { cardId } = await context.params;
+
+    const body =
+      (await req.json()) as ProductionDetailsPayload;
+
+    const key = process.env.TRELLO_KEY;
+    const token = process.env.TRELLO_TOKEN;
+    const boardId = process.env.TRELLO_BOARD_ID;
+    const station4ListId =
+      process.env.TRELLO_STATION4_LIST_ID;
+
+    if (
+      !key ||
+      !token ||
+      !boardId ||
+      !station4ListId
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Missing Trello environment variables.",
+        },
+        {
+          status: 500,
+        },
+      );
+    }
+
+    if (!textValue(body.orderPriority)) {
+      return NextResponse.json(
+        {
+          error: "Order priority is required.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    const documentValidationError =
+      validateDocuments(body.documents);
+
+    if (documentValidationError) {
+      return NextResponse.json(
+        {
+          error: documentValidationError,
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    const documents = normalizeDocuments(
+      body.documents,
+    );
+
+    const card = await trelloRequest<TrelloCard>(
+      `https://api.trello.com/1/cards/${cardId}?fields=id,name,desc&key=${key}&token=${token}`,
+    );
+
+    const source = await loadSourceOrderData(
+      cardId,
+      card,
+    );
+
+    const actions = await getCardMoveActions(
+      cardId,
+      key,
+      token,
+    );
+
+    const productionStartRaw =
+      findFirstMoveInto(
+        actions,
+        PRODUCTION_START_LIST,
+      );
+
+    const productionStartDate =
+      productionStartRaw
+        ? new Date(productionStartRaw)
+        : null;
 
     const deliveryStrategy: DeliveryStrategy =
-      body.deliveryStrategy === "PARTIAL" ? "PARTIAL" : "COMPLETE";
+      body.deliveryStrategy === "PARTIAL"
+        ? "PARTIAL"
+        : "COMPLETE";
 
-    const initialReleaseQty = value(body.initialReleaseQty || "10");
-
-    const initialDueWorkingDays = toPositiveNumber(
-      body.initialDueWorkingDays,
-      10,
+    const initialReleaseQty = value(
+      body.initialReleaseQty || "10",
     );
 
-    const isRush = body.orderPriority?.trim().toLowerCase() === "rush";
+    const initialDueWorkingDays =
+      toPositiveNumber(
+        body.initialDueWorkingDays,
+        10,
+      );
+
+    const isRush =
+      body.orderPriority
+        .trim()
+        .toLowerCase() === "rush";
 
     const finalDueWorkingDays =
       deliveryStrategy === "PARTIAL"
-        ? toPositiveNumber(body.finalDueWorkingDays, 30)
+        ? toPositiveNumber(
+            body.finalDueWorkingDays,
+            30,
+          )
         : isRush
           ? 3
           : 10;
 
+    if (
+      deliveryStrategy === "PARTIAL" &&
+      finalDueWorkingDays <
+        initialDueWorkingDays
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Final due working days cannot be earlier than initial due working days.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
     const initialDueDate =
-      productionStartDate && deliveryStrategy === "PARTIAL"
-        ? addWorkingDays(productionStartDate, initialDueWorkingDays)
+      productionStartDate &&
+      deliveryStrategy === "PARTIAL"
+        ? addWorkingDays(
+            productionStartDate,
+            initialDueWorkingDays,
+          )
         : null;
 
     const finalDueDate = productionStartDate
-      ? addWorkingDays(productionStartDate, finalDueWorkingDays)
+      ? addWorkingDays(
+          productionStartDate,
+          finalDueWorkingDays,
+        )
       : null;
 
     const trelloDueDate =
-      deliveryStrategy === "PARTIAL" ? initialDueDate : finalDueDate;
+      deliveryStrategy === "PARTIAL"
+        ? initialDueDate
+        : finalDueDate;
+
+    const paperSummary =
+      summarizeDocumentField(
+        documents,
+        "paperType",
+      );
+
+    const plySummary =
+      summarizeDocumentField(
+        documents,
+        "ply",
+      );
+
+    const sizeSummary =
+      summarizeDocumentField(
+        documents,
+        "size",
+      );
+
+    const documentSpecifications =
+      buildDocumentSpecificationsSection(
+        documents,
+      );
 
     const compactDescription = `
-TRACKING: ${trackingNo}
+TRACKING: ${source.trackingNo}
 
-OCN: ${ocn}
-TIN: ${tin}
+OCN: ${source.ocn}
+TIN: ${source.tin}
 
-TRADE NAME: ${tradeName}
-RDO: ${rdo}
+TRADE NAME: ${source.tradeName}
+RDO: ${source.rdo}
 
-DOCUMENT: ${documentType}
-TAX TYPE: ${taxType}
-ATP: ${atp}
+DOCUMENT: ${source.documentType}
+TAX TYPE: ${source.taxType}
+ATP: ${source.atp}
 
-QTY: ${qty}
-SERIAL: ${serial}
+QTY: ${source.qty}
+SERIAL: ${source.serial}
 
 PRIORITY: ${body.orderPriority}
 
 DELIVERY COMMITMENT:
-DELIVERY STRATEGY: ${getDeliveryLabel(deliveryStrategy)}
+DELIVERY STRATEGY: ${getDeliveryLabel(
+      deliveryStrategy,
+    )}
 INITIAL RELEASE QTY: ${
-      deliveryStrategy === "PARTIAL" ? `${initialReleaseQty} Booklets` : "-"
+      deliveryStrategy === "PARTIAL"
+        ? `${initialReleaseQty} Booklets`
+        : "-"
     }
-INITIAL DUE WD: ${deliveryStrategy === "PARTIAL" ? initialDueWorkingDays : "-"}
+INITIAL DUE WD: ${
+      deliveryStrategy === "PARTIAL"
+        ? initialDueWorkingDays
+        : "-"
+    }
 FINAL DUE WD: ${finalDueWorkingDays}
 PRODUCTION START: ${
-      productionStartDate ? formatDateOnly(productionStartDate) : "Not Started"
+      productionStartDate
+        ? formatDateOnly(productionStartDate)
+        : "Not Started"
     }
 INITIAL DUE DATE: ${
-      initialDueDate ? formatDateOnly(initialDueDate) : "Pending Station 1 & 2"
+      initialDueDate
+        ? formatDateOnly(initialDueDate)
+        : "Pending Station 1 & 2"
     }
 FINAL DUE DATE: ${
-      finalDueDate ? formatDateOnly(finalDueDate) : "Pending Station 1 & 2"
+      finalDueDate
+        ? formatDateOnly(finalDueDate)
+        : "Pending Station 1 & 2"
     }
 
 PRODUCTION:
-PAPER: ${body.paperType}
-PLY: ${body.ply}
-SIZE: ${body.size}
-SPECIAL: ${body.specialInstructions || "-"}
+PAPER: ${paperSummary}
+PLY: ${plySummary}
+SIZE: ${sizeSummary}
+SPECIAL: See individual document specifications
 STATUS: Production Details Complete
+
+${documentSpecifications}
 `.trim();
 
     const updatePayload: {
       desc: string;
       idList: string;
-      due?: string | null;
+      due: string | null;
     } = {
       desc: compactDescription,
       idList: station4ListId,
+      due: trelloDueDate
+        ? trelloDueDate.toISOString()
+        : null,
     };
 
-    /*
-     * Clear an old due date when production has not started yet.
-     */
-    updatePayload.due = trelloDueDate ? trelloDueDate.toISOString() : null;
-
-    const updatedCard = await trelloRequest<TrelloCard>(
-      `https://api.trello.com/1/cards/${cardId}?key=${key}&token=${token}`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
+    const updatedCard =
+      await trelloRequest<TrelloCard>(
+        `https://api.trello.com/1/cards/${cardId}?key=${key}&token=${token}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify(updatePayload),
         },
-        body: JSON.stringify(updatePayload),
-      },
+      );
+
+    await removeOldPriorityLabels(
+      cardId,
+      key,
+      token,
     );
 
-    /*
-     * Sync Rush or Normal priority label.
-     */
-    await removeOldPriorityLabels(cardId, key, token);
+    const priorityLabelId =
+      await getOrCreatePriorityLabel(
+        key,
+        token,
+        boardId,
+        body.orderPriority,
+      );
 
-    const priorityLabelId = await getOrCreatePriorityLabel(
+    await addLabelToCard(
+      cardId,
+      priorityLabelId,
+      key,
+      token,
+    );
+
+    await syncProductionChecklists(
+      cardId,
+      deliveryStrategy,
+      key,
+      token,
+    );
+
+    await syncPartialOrderLabel(
+      cardId,
+      deliveryStrategy,
       key,
       token,
       boardId,
-      body.orderPriority,
     );
-
-    await addLabelToCard(cardId, priorityLabelId, key, token);
-
-    /*
-     * Normalize workflow checklists first.
-     *
-     * Complete:
-     * Status -> Done
-     *
-     * Partial:
-     * Status -> Done
-     * Initial Commitment -> Initial Release Completed
-     */
-    await syncProductionChecklists(cardId, deliveryStrategy, key, token);
-
-    /*
-     * Sync the Partial Order label after the checklist workflow.
-     *
-     * This prevents a label API failure from stopping checklist creation.
-     */
-    await syncPartialOrderLabel(cardId, deliveryStrategy, key, token, boardId);
 
     return NextResponse.json({
       success: true,
       card: updatedCard,
+      documents,
       deliveryStrategy,
-      partialOrderLabel: deliveryStrategy === "PARTIAL",
+      partialOrderLabel:
+        deliveryStrategy === "PARTIAL",
     });
   } catch (error) {
+    console.error(
+      "PUT production details error:",
+      error,
+    );
+
     return NextResponse.json(
       {
         error:
