@@ -1,13 +1,19 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useState,
+} from "react";
 
 type NavItemProps = {
   label: string;
   href: string;
   active?: boolean;
+  nested?: boolean;
   onClick?: () => void;
 };
 
@@ -15,15 +21,32 @@ type ContentWidth = "standard" | "wide" | "form";
 
 type AppShellProps = {
   activePage: string;
-  children: React.ReactNode;
+  children: ReactNode;
   contentWidth?: ContentWidth;
 };
 
-const CONTENT_WIDTH_CLASSES: Record<ContentWidth, string> = {
+const CONTENT_WIDTH_CLASSES: Record<
+  ContentWidth,
+  string
+> = {
   standard: "max-w-[1500px]",
   wide: "max-w-[1800px]",
   form: "max-w-[1400px]",
 };
+
+function pathMatches(
+  pathname: string,
+  href: string,
+): boolean {
+  if (href === "/") {
+    return pathname === "/";
+  }
+
+  return (
+    pathname === href ||
+    pathname.startsWith(`${href}/`)
+  );
+}
 
 export default function AppShell({
   activePage,
@@ -31,12 +54,18 @@ export default function AppShell({
   contentWidth = "standard",
 }: AppShellProps) {
   const pathname = usePathname();
-  const [menuOpenedAtPath, setMenuOpenedAtPath] = useState<string | null>(null);
 
-  const mobileMenuOpen = menuOpenedAtPath === pathname;
+  const [
+    menuOpenedAtPath,
+    setMenuOpenedAtPath,
+  ] = useState<string | null>(null);
+
+  const mobileMenuOpen =
+    menuOpenedAtPath === pathname;
 
   useEffect(() => {
-    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
+    document.body.style.overflow =
+      mobileMenuOpen ? "hidden" : "";
 
     return () => {
       document.body.style.overflow = "";
@@ -46,12 +75,17 @@ export default function AppShell({
   return (
     <main className="h-screen overflow-hidden bg-[#fbf7ef] text-black">
       <div className="flex h-full min-w-0">
-        <DesktopSidebar activePage={activePage} />
+        <DesktopSidebar
+          activePage={activePage}
+          pathname={pathname}
+        />
 
         <div className="flex min-w-0 flex-1 flex-col">
           <MobileHeader
             menuOpen={mobileMenuOpen}
-            onMenuClick={() => setMenuOpenedAtPath(pathname)}
+            onMenuClick={() =>
+              setMenuOpenedAtPath(pathname)
+            }
           />
 
           <section className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-9 lg:py-8">
@@ -66,17 +100,29 @@ export default function AppShell({
 
       <MobileSidebar
         activePage={activePage}
+        pathname={pathname}
         open={mobileMenuOpen}
-        onClose={() => setMenuOpenedAtPath(null)}
+        onClose={() =>
+          setMenuOpenedAtPath(null)
+        }
       />
     </main>
   );
 }
 
-function DesktopSidebar({ activePage }: { activePage: string }) {
+function DesktopSidebar({
+  activePage,
+  pathname,
+}: {
+  activePage: string;
+  pathname: string;
+}) {
   return (
     <aside className="hidden h-screen w-[290px] shrink-0 border-r border-[#e3d8c7] bg-[#fffaf2] lg:flex lg:flex-col">
-      <SidebarContent activePage={activePage} />
+      <SidebarContent
+        activePage={activePage}
+        pathname={pathname}
+      />
     </aside>
   );
 }
@@ -101,7 +147,10 @@ function MobileHeader({
         />
 
         <div>
-          <p className="text-sm font-black text-black">LIC Operations Center</p>
+          <p className="text-sm font-black text-black">
+            LIC Operations Center
+          </p>
+
           <p className="text-xs font-semibold text-[#6b421f]">
             Production System
           </p>
@@ -125,25 +174,31 @@ function MobileHeader({
 
 function MobileSidebar({
   activePage,
+  pathname,
   open,
   onClose,
 }: {
   activePage: string;
+  pathname: string;
   open: boolean;
   onClose: () => void;
 }) {
   return (
     <div
-      className={`fixed inset-0 z-50 lg:hidden ${open ? "pointer-events-auto" : "pointer-events-none"
-        }`}
+      className={`fixed inset-0 z-50 lg:hidden ${
+        open
+          ? "pointer-events-auto"
+          : "pointer-events-none"
+      }`}
       aria-hidden={!open}
     >
       <button
         type="button"
         aria-label="Close navigation menu"
         onClick={onClose}
-        className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0"
-          }`}
+        className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${
+          open ? "opacity-100" : "opacity-0"
+        }`}
       />
 
       <aside
@@ -151,8 +206,11 @@ function MobileSidebar({
         role="dialog"
         aria-modal="true"
         aria-label="Mobile navigation"
-        className={`absolute inset-y-0 left-0 flex w-[min(86vw,320px)] flex-col border-r border-[#e3d8c7] bg-[#fffaf2] shadow-2xl transition-transform duration-300 ease-out ${open ? "translate-x-0" : "-translate-x-full"
-          }`}
+        className={`absolute inset-y-0 left-0 flex w-[min(86vw,320px)] flex-col border-r border-[#e3d8c7] bg-[#fffaf2] shadow-2xl transition-transform duration-300 ease-out ${
+          open
+            ? "translate-x-0"
+            : "-translate-x-full"
+        }`}
       >
         <div className="flex items-center justify-between border-b border-[#e3d8c7] px-4 py-3">
           <p className="text-sm font-black uppercase tracking-wide text-[#6b421f]">
@@ -169,7 +227,11 @@ function MobileSidebar({
           </button>
         </div>
 
-        <SidebarContent activePage={activePage} onNavigate={onClose} />
+        <SidebarContent
+          activePage={activePage}
+          pathname={pathname}
+          onNavigate={onClose}
+        />
       </aside>
     </div>
   );
@@ -177,11 +239,68 @@ function MobileSidebar({
 
 function SidebarContent({
   activePage,
+  pathname,
   onNavigate,
 }: {
   activePage: string;
+  pathname: string;
   onNavigate?: () => void;
 }) {
+  const printingActive =
+    pathMatches(pathname, "/orders/printing");
+
+  const transactionsActive = pathMatches(
+    pathname,
+    "/orders/transactions",
+  );
+
+  const atpProcessingActive = pathMatches(
+    pathname,
+    "/orders/transactions/atp",
+  );
+
+  const [printingOpen, setPrintingOpen] =
+    useState(printingActive);
+
+  const [transactionsOpen, setTransactionsOpen] =
+    useState(transactionsActive);
+
+  useEffect(() => {
+
+    if (printingActive) {
+      setPrintingOpen(true);
+    }
+
+    if (transactionsActive) {
+      setTransactionsOpen(true);
+    }
+  }, [
+    printingActive,
+    transactionsActive,
+  ]);
+
+  const legacyProductionActive =
+    activePage === "production" ||
+    pathMatches(pathname, "/production");
+
+  const legacyReceivedAtpActive =
+    activePage === "received-atp" ||
+    pathMatches(pathname, "/received-atp");
+
+  const legacyNonBirActive =
+    activePage === "non-bir-orders" ||
+    pathMatches(pathname, "/non-bir-orders");
+
+  const printingSectionActive =
+    printingActive ||
+    legacyReceivedAtpActive ||
+    legacyNonBirActive ||
+    legacyProductionActive;
+
+  const dashboardActive =
+    activePage === "dashboard" &&
+    pathname === "/";
+
   return (
     <>
       <div className="shrink-0 px-5 pt-5">
@@ -203,61 +322,120 @@ function SidebarContent({
         </p>
       </div>
 
-      <nav className="mt-7 min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-6 text-sm">
+      <nav className="mt-7 min-h-0 flex-1 overflow-y-auto px-4 pb-6 text-sm">
         <NavItem
-          active={activePage === "dashboard"}
+          active={dashboardActive}
           label="DASHBOARD"
           href="/"
           onClick={onNavigate}
         />
 
-        <p className="px-3 pt-7 text-xs font-black uppercase tracking-widest text-[#6b421f]">
-          Admin
-        </p>
+        <div className="mt-7">
+          <SectionLabel>Orders</SectionLabel>
 
-        <NavItem
-          active={activePage === "received-atp"}
-          label="Received ATP"
-          href="/received-atp"
-          onClick={onNavigate}
-        />
+          <NavGroupButton
+            label="Printing"
+            open={printingOpen}
+            active={printingSectionActive}
+            onClick={() =>
+              setPrintingOpen(
+                (current) => !current,
+              )
+            }
+          />
 
-        <NavItem
-          active={activePage === "non-bir-orders"}
-          label="Non-BIR Orders"
-          href="/non-bir-orders"
-          onClick={onNavigate}
-        />
+          {printingOpen && (
+            <div className="ml-4 border-l border-[#dccdb8] pl-3">
+              <NavItem
+                active={legacyReceivedAtpActive}
+                label="BIR Printing"
+                href="/received-atp"
+                nested
+                onClick={onNavigate}
+              />
 
-        <NavItem
-          active={activePage === "production"}
-          label="Production Queue"
-          href="/production"
-          onClick={onNavigate}
-        />
+              <NavItem
+                active={legacyNonBirActive}
+                label="Non-BIR Printing"
+                href="/non-bir-orders"
+                nested
+                onClick={onNavigate}
+              />
+
+              <NavItem
+                active={legacyProductionActive}
+                label="Production Queue"
+                href="/production"
+                nested
+                onClick={onNavigate}
+              />
+            </div>
+          )}
+
+          <NavGroupButton
+            label="Transactions"
+            open={transactionsOpen}
+            active={transactionsActive}
+            onClick={() =>
+              setTransactionsOpen(
+                (current) => !current,
+              )
+            }
+          />
+
+          {transactionsOpen && (
+            <div className="ml-4 border-l border-[#dccdb8] pl-3">
+              <NavItem
+                active={atpProcessingActive}
+                label="ATP Processing"
+                href="/orders/transactions/atp"
+                nested
+                onClick={onNavigate}
+              />
+            </div>
+          )}
+        </div>
 
         <div className="my-6 border-t border-[#e3d8c7]" />
 
-        <p className="px-3 text-xs font-black uppercase tracking-widest text-[#6b421f]">
-          Production
-        </p>
+        <SectionLabel>Production</SectionLabel>
 
         <NavItem
-          active={activePage === "production-tracker"}
+          active={
+            activePage ===
+              "production-tracker" ||
+            pathMatches(
+              pathname,
+              "/production-tracker",
+            )
+          }
           label="Production Tracker"
           href="/production-tracker"
           onClick={onNavigate}
         />
 
         <NavItem
-          active={activePage === "daily-operations"}
+          active={
+            activePage ===
+              "daily-operations" ||
+            pathMatches(
+              pathname,
+              "/daily-operations",
+            )
+          }
           label="Daily Operations"
           href="/daily-operations"
           onClick={onNavigate}
         />
 
         <NavItem
-          active={activePage === "employees"}
+          active={
+            activePage === "employees" ||
+            pathMatches(
+              pathname,
+              "/employees",
+            )
+          }
           label="Employees"
           href="/employees"
           onClick={onNavigate}
@@ -271,26 +449,84 @@ function SidebarContent({
   );
 }
 
-function NavItem({ label, href, active = false, onClick }: NavItemProps) {
+function SectionLabel({
+  children,
+}: {
+  children: ReactNode;
+}) {
   return (
-    <a
+    <p className="px-3 pb-2 text-xs font-black uppercase tracking-widest text-[#6b421f]">
+      {children}
+    </p>
+  );
+}
+
+function NavGroupButton({
+  label,
+  open,
+  active,
+  onClick,
+}: {
+  label: string;
+  open: boolean;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={open}
+      className={`mt-1 flex w-full items-center justify-between rounded-lg px-5 py-4 text-left text-sm transition ${
+        active
+          ? "bg-[#f3dfbf] font-black text-black"
+          : "font-bold text-black hover:bg-[#f7ead6]"
+      }`}
+    >
+      <span>{label}</span>
+
+      <ChevronIcon open={open} />
+    </button>
+  );
+}
+
+function NavItem({
+  label,
+  href,
+  active = false,
+  nested = false,
+  onClick,
+}: NavItemProps) {
+  return (
+    <Link
       href={href}
       onClick={onClick}
-      aria-current={active ? "page" : undefined}
-      className={`block rounded-lg px-5 py-4 text-sm transition ${active
+      aria-current={
+        active ? "page" : undefined
+      }
+      className={`block rounded-lg text-sm transition ${
+        nested
+          ? "my-1 px-4 py-3"
+          : "px-5 py-4"
+      } ${
+        active
           ? "bg-[#f3dfbf] font-black text-black"
           : "font-medium text-black hover:bg-[#f7ead6]"
-        }`}
+      }`}
     >
       {label}
-    </a>
+    </Link>
   );
 }
 
 function LogoutButton() {
   const router = useRouter();
-  const [loggingOut, setLoggingOut] = useState(false);
-  const [error, setError] = useState("");
+
+  const [loggingOut, setLoggingOut] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
 
   async function handleLogout() {
     if (loggingOut) {
@@ -301,19 +537,31 @@ function LogoutButton() {
     setError("");
 
     try {
-      const response = await fetch("/api/logout", {
-        method: "POST",
-      });
+      const response = await fetch(
+        "/api/logout",
+        {
+          method: "POST",
+        },
+      );
 
       if (!response.ok) {
-        throw new Error("Logout request failed.");
+        throw new Error(
+          "Logout request failed.",
+        );
       }
 
       router.replace("/login");
       router.refresh();
     } catch (logoutError) {
-      console.error("Logout error:", logoutError);
-      setError("Unable to log out. Please try again.");
+      console.error(
+        "Logout error:",
+        logoutError,
+      );
+
+      setError(
+        "Unable to log out. Please try again.",
+      );
+
       setLoggingOut(false);
     }
   }
@@ -327,7 +575,10 @@ function LogoutButton() {
         className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-5 py-3.5 text-sm font-black text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <LogoutIcon />
-        {loggingOut ? "Logging out..." : "Logout"}
+
+        {loggingOut
+          ? "Logging out..."
+          : "Logout"}
       </button>
 
       {error && (
@@ -336,6 +587,29 @@ function LogoutButton() {
         </p>
       )}
     </div>
+  );
+}
+
+function ChevronIcon({
+  open,
+}: {
+  open: boolean;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className={`h-4 w-4 transition-transform ${
+        open ? "rotate-180" : ""
+      }`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
   );
 }
 
