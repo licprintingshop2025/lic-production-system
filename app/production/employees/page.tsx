@@ -1,6 +1,6 @@
 import Link from "next/link";
-import AppShell from "../components/AppShell";
-import PageHeader from "../components/PageHeader";
+import AppShell from "@/app/components/AppShell";
+import PageHeader from "@/app/components/PageHeader";
 
 type Employee = {
   employeeId: string;
@@ -59,7 +59,7 @@ export default async function EmployeesPage() {
             </a>
 
             <Link
-              href="/employees/new"
+              href="/production/employees/new"
               className="rounded-lg bg-[#e1bb5f] px-5 py-2 text-sm font-black text-black hover:bg-[#edca73]"
             >
               + New Employee
@@ -161,14 +161,14 @@ export default async function EmployeesPage() {
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-2">
                           <Link
-                            href={`/employees/${employee.employeeId}`}
+                            href={`/production/employees/${employee.employeeId}`}
                             className="..."
                           >
                             View
                           </Link>
 
                           <Link
-                            href={`/employees/${employee.employeeId}`}
+                            href={`/production/employees/${employee.employeeId}`}
                             className="..."
                           >
                             Edit

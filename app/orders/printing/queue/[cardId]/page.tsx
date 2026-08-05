@@ -1,6 +1,6 @@
 import Link from "next/link";
-import AppShell from "../../components/AppShell";
-import PageHeader from "../../components/PageHeader";
+import AppShell from "@/app/components/AppShell";
+import PageHeader from "@/app/components/PageHeader";
 import {
   findReceivedATPByCardId,
   findNonBIROrderByCardId,
@@ -387,7 +387,7 @@ function BottomActions({ trelloUrl }: { trelloUrl: string }) {
 
         <div className="flex gap-3">
           <Link
-            href="/production"
+            href="/orders/printing/queue"
             className="rounded-lg border border-[#e6ddd1] bg-white px-6 py-3 text-sm font-bold text-black hover:bg-[#fbf7ef]"
           >
             Back to Queue

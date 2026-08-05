@@ -326,7 +326,7 @@ export default async function Home() {
                   <tr key={row.id} className="border-t border-[#eee4d6]">
                     <td className="p-4 font-bold">
                       <a
-                        href={`/production/${row.id}`}
+                        href={`/orders/printing/queue/${row.id}`}
                         className="text-[#9b6a22] hover:underline"
                       >
                         {row.trackingNo || "-"}

@@ -9,8 +9,8 @@ import {
   type ChangeEventHandler,
   type FormEvent,
 } from "react";
-import AppShell from "../../../components/AppShell";
-import PageHeader from "../../../components/PageHeader";
+import AppShell from "@/app/components/AppShell";
+import PageHeader from "@/app/components/PageHeader";
 
 type DeliveryStrategy = "COMPLETE" | "PARTIAL";
 
@@ -681,7 +681,7 @@ export default function CompleteProductionDetailsPage() {
         "Production details saved and card moved to Station 4.",
       );
 
-      router.push(`/production/${cardId}`);
+      router.push(`/orders/printing/queue/${cardId}`);
       router.refresh();
     } catch (error) {
       alert(
@@ -753,7 +753,7 @@ export default function CompleteProductionDetailsPage() {
             <button
               type="button"
               onClick={() =>
-                router.push("/production")
+                router.push("/orders/printing/queue")
               }
               className="rounded-xl border border-red-200 bg-white px-5 py-3 text-sm font-bold text-red-800 transition hover:bg-red-100"
             >
@@ -1026,7 +1026,7 @@ export default function CompleteProductionDetailsPage() {
               <button
                 type="button"
                 onClick={() =>
-                  router.push("/production")
+                  router.push("/orders/printing/queue")
                 }
                 disabled={submitting}
                 className="rounded-xl border border-[#dfd4c4] bg-white px-6 py-3 text-sm font-bold text-[#3f352a] transition hover:bg-[#fbf7ef] disabled:cursor-not-allowed disabled:opacity-60"

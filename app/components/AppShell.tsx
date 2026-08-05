@@ -246,8 +246,25 @@ function SidebarContent({
   pathname: string;
   onNavigate?: () => void;
 }) {
-  const printingActive =
-    pathMatches(pathname, "/orders/printing");
+  const printingActive = pathMatches(
+    pathname,
+    "/orders/printing",
+  );
+
+  const birPrintingActive = pathMatches(
+    pathname,
+    "/orders/printing/bir",
+  );
+
+  const nonBirPrintingActive = pathMatches(
+    pathname,
+    "/orders/printing/non-bir",
+  );
+
+  const productionQueueActive = pathMatches(
+    pathname,
+    "/orders/printing/queue",
+  );
 
   const transactionsActive = pathMatches(
     pathname,
@@ -259,14 +276,30 @@ function SidebarContent({
     "/orders/transactions/atp",
   );
 
+  const productionTrackerActive = pathMatches(
+    pathname,
+    "/production/tracker",
+  );
+
+  const dailyOperationsActive = pathMatches(
+    pathname,
+    "/production/daily-operations",
+  );
+
+  const employeesActive = pathMatches(
+    pathname,
+    "/production/employees",
+  );
+
   const [printingOpen, setPrintingOpen] =
     useState(printingActive);
 
-  const [transactionsOpen, setTransactionsOpen] =
-    useState(transactionsActive);
+  const [
+    transactionsOpen,
+    setTransactionsOpen,
+  ] = useState(transactionsActive);
 
   useEffect(() => {
-
     if (printingActive) {
       setPrintingOpen(true);
     }
@@ -278,24 +311,6 @@ function SidebarContent({
     printingActive,
     transactionsActive,
   ]);
-
-  const legacyProductionActive =
-    activePage === "production" ||
-    pathMatches(pathname, "/production");
-
-  const legacyReceivedAtpActive =
-    activePage === "received-atp" ||
-    pathMatches(pathname, "/received-atp");
-
-  const legacyNonBirActive =
-    activePage === "non-bir-orders" ||
-    pathMatches(pathname, "/non-bir-orders");
-
-  const printingSectionActive =
-    printingActive ||
-    legacyReceivedAtpActive ||
-    legacyNonBirActive ||
-    legacyProductionActive;
 
   const dashboardActive =
     activePage === "dashboard" &&
@@ -336,7 +351,7 @@ function SidebarContent({
           <NavGroupButton
             label="Printing"
             open={printingOpen}
-            active={printingSectionActive}
+            active={printingActive}
             onClick={() =>
               setPrintingOpen(
                 (current) => !current,
@@ -347,25 +362,25 @@ function SidebarContent({
           {printingOpen && (
             <div className="ml-4 border-l border-[#dccdb8] pl-3">
               <NavItem
-                active={legacyReceivedAtpActive}
+                active={birPrintingActive}
                 label="BIR Printing"
-                href="/received-atp"
+                href="/orders/printing/bir"
                 nested
                 onClick={onNavigate}
               />
 
               <NavItem
-                active={legacyNonBirActive}
+                active={nonBirPrintingActive}
                 label="Non-BIR Printing"
-                href="/non-bir-orders"
+                href="/orders/printing/non-bir"
                 nested
                 onClick={onNavigate}
               />
 
               <NavItem
-                active={legacyProductionActive}
+                active={productionQueueActive}
                 label="Production Queue"
-                href="/production"
+                href="/orders/printing/queue"
                 nested
                 onClick={onNavigate}
               />
@@ -401,43 +416,23 @@ function SidebarContent({
         <SectionLabel>Production</SectionLabel>
 
         <NavItem
-          active={
-            activePage ===
-              "production-tracker" ||
-            pathMatches(
-              pathname,
-              "/production-tracker",
-            )
-          }
+          active={productionTrackerActive}
           label="Production Tracker"
-          href="/production-tracker"
+          href="/production/tracker"
           onClick={onNavigate}
         />
 
         <NavItem
-          active={
-            activePage ===
-              "daily-operations" ||
-            pathMatches(
-              pathname,
-              "/daily-operations",
-            )
-          }
+          active={dailyOperationsActive}
           label="Daily Operations"
-          href="/daily-operations"
+          href="/production/daily-operations"
           onClick={onNavigate}
         />
 
         <NavItem
-          active={
-            activePage === "employees" ||
-            pathMatches(
-              pathname,
-              "/employees",
-            )
-          }
+          active={employeesActive}
           label="Employees"
-          href="/employees"
+          href="/production/employees"
           onClick={onNavigate}
         />
       </nav>

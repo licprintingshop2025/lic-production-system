@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import AppShell from "../components/AppShell";
-import PageHeader from "../components/PageHeader";
+import AppShell from "@/app/components/AppShell";
+import PageHeader from "@/app/components/PageHeader";
 import DocumentItemCard, {
   createEmptyDocument,
 } from "@/app/components/forms/DocumentItemCard";

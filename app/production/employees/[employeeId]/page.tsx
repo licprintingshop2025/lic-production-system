@@ -2,8 +2,8 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import AppShell from "../../components/AppShell";
-import PageHeader from "../../components/PageHeader";
+import AppShell from "@/app/components/AppShell";
+import PageHeader from "@/app/components/PageHeader";
 
 type Employee = {
   employeeId: string;
@@ -134,7 +134,7 @@ export default function EmployeeDetailsPage() {
     }
 
     alert("Employee updated successfully.");
-    router.push("/employees");
+    router.push("/production/employees");
   }
 
   if (loading) {
@@ -295,7 +295,7 @@ export default function EmployeeDetailsPage() {
           <div className="flex shrink-0 justify-end gap-3">
             <button
               type="button"
-              onClick={() => router.push("/employees")}
+              onClick={() => router.push("/production/employees")}
               className="rounded-lg border border-[#e6ddd1] bg-white px-6 py-3 text-sm font-bold text-black transition hover:bg-[#fbf7ef]"
             >
               Cancel

@@ -7,9 +7,9 @@ import {
   useRef,
   useState,
 } from "react";
-import AppShell from "../components/AppShell";
-import PageHeader from "../components/PageHeader";
-import ProductionSyncRunner from "../components/ProductionSyncRunner";
+import AppShell from "@/app/components/AppShell";
+import PageHeader from "@/app/components/PageHeader";
+import ProductionSyncRunner from "@/app/components/ProductionSyncRunner";
 import {
   generateSmartAssignments,
   type Assignment,

@@ -1,7 +1,6 @@
 import Link from "next/link";
-import AppShell from "../components/AppShell";
-import PageHeader from "../components/PageHeader";
-
+import AppShell from "@/app/components/AppShell";
+import PageHeader from "@/app/components/PageHeader";
 type TrelloCard = {
   id: string;
   name: string;
@@ -134,14 +133,14 @@ export default async function ProductionPage() {
                     <td className="p-4">
                       <div className="flex justify-end gap-3">
                         <Link
-                          href={`/production/${card.id}`}
+                          href={`/orders/printing/queue/${card.id}`}
                           className="rounded-xl border border-[#dfd4c4] bg-white px-4 py-2 text-sm font-bold text-[#3f352a] hover:bg-[#fbf7ef]"
                         >
                           View
                         </Link>
 
                         <Link
-                          href={`/production/${card.id}/edit`}
+                          href={`/orders/printing/queue/${card.id}/edit`}
                           className="rounded-xl bg-[#e1bb5f] px-4 py-2 text-sm font-black text-black hover:bg-[#edca73]"
                         >
                           Complete Details

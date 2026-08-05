@@ -1,6 +1,6 @@
-import AppShell from "../components/AppShell";
-import PageHeader from "../components/PageHeader";
-import ProductionSyncRunner from "../components/ProductionSyncRunner";
+import AppShell from "@/app/components/AppShell";
+import PageHeader from "@/app/components/PageHeader";
+import ProductionSyncRunner from "@/app/components/ProductionSyncRunner";
 
 type TrackerDocument = {
   id: string;
@@ -477,7 +477,7 @@ export default async function ProductionTrackerPage() {
                     >
                       <td className="p-4 font-bold">
                         <a
-                          href={`/production/${row.id}`}
+                          href={`/orders/printing/queue/${row.id}`}
                           className="text-[#9b6a22] hover:underline"
                         >
                           {row.trackingNo || "-"}
