@@ -567,7 +567,7 @@ function LogoutButton() {
         type="button"
         onClick={handleLogout}
         disabled={loggingOut}
-        className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-5 py-3.5 text-sm font-black text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-2 rounded-lg border border-black-200 bg-white px-5 py-3.5 text-sm font-black text-black-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <LogoutIcon />
 
