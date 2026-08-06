@@ -1,6 +1,7 @@
 import AppShell from "@/app/components/AppShell";
 import PageHeader from "@/app/components/PageHeader";
 import ProductionSyncRunner from "@/app/components/ProductionSyncRunner";
+import Link from "next/link";
 
 type TrackerDocument = {
   id: string;
@@ -47,9 +48,33 @@ type TrackerRow = {
   url: string;
 };
 
+type ProductionTrackerPageProps = {
+  searchParams: Promise<{
+    search?: string;
+    station?: string;
+  }>;
+};
+
 const BASE_URL =
   process.env.NEXT_PUBLIC_APP_URL ||
   "http://localhost:3000";
+
+const STATION_FILTER_OPTIONS = [
+  "Station 1 & 2",
+  "Admin Head",
+  "Quality Checking",
+  "Receiving & Pre-Print Formatting",
+  "Running",
+  "Numbering",
+  "Collating",
+  "Stapling / Padding",
+  "Cutting & Trimming",
+  "Browning",
+  "Stamping",
+  "Packaging & Labelling",
+  "Finish Receipt",
+  "Ready for Release",
+] as const;
 
 async function getTrackerRows() {
   const response = await fetch(
@@ -72,23 +97,46 @@ async function getTrackerRows() {
     : [];
 }
 
-function shortStation(station: string) {
-  const value = station.toUpperCase();
+function normalizeSearchValue(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
+}
 
-  if (value.includes("STATION 1")) {
+function getStationFilterValue(
+  station: string,
+): string {
+  const value = String(station || "")
+    .trim()
+    .toUpperCase();
+
+  if (
+    value.includes("STATION 1") ||
+    value.includes("LAYOUT") ||
+    value.includes("ENCODING")
+  ) {
     return "Station 1 & 2";
   }
 
-  if (value.includes("ADMIN HEAD")) {
+  if (
+    value.includes("ADMIN HEAD") ||
+    value.includes("APPROVAL TO PRINTING")
+  ) {
     return "Admin Head";
   }
 
-  if (value.includes("QUALITY")) {
-    return "Quality Check";
+  if (
+    value.includes("QUALITY CHECK") ||
+    value.includes("QUALITY CONTROL")
+  ) {
+    return "Quality Checking";
   }
 
-  if (value.includes("RECEIVING")) {
-    return "Pre-Print";
+  if (
+    value.includes("RECEIVING") ||
+    value.includes("PRE-PRINT")
+  ) {
+    return "Receiving & Pre-Print Formatting";
   }
 
   if (value.includes("RUNNING")) {
@@ -103,12 +151,18 @@ function shortStation(station: string) {
     return "Collating";
   }
 
-  if (value.includes("STAPLING")) {
-    return "Stapling";
+  if (
+    value.includes("STAPLING") ||
+    value.includes("PADDING")
+  ) {
+    return "Stapling / Padding";
   }
 
-  if (value.includes("CUTTING")) {
-    return "Cutting";
+  if (
+    value.includes("CUTTING") ||
+    value.includes("TRIMMING")
+  ) {
+    return "Cutting & Trimming";
   }
 
   if (value.includes("BROWNING")) {
@@ -119,19 +173,81 @@ function shortStation(station: string) {
     return "Stamping";
   }
 
-  if (value.includes("PACKAGING")) {
-    return "Packaging";
+  if (
+    value.includes("PACKAGING") ||
+    value.includes("LABELLING") ||
+    value.includes("LABELING")
+  ) {
+    return "Packaging & Labelling";
   }
 
-  if (value.includes("FINISH")) {
+  if (
+    value.includes("FINISH RECEIPT") ||
+    value.includes("FINISH")
+  ) {
     return "Finish Receipt";
   }
 
-  if (value.includes("READY")) {
-    return "Ready Release";
+  if (
+    value.includes("READY FOR RELEASE") ||
+    value.includes("READY RELEASE")
+  ) {
+    return "Ready for Release";
   }
 
-  return station;
+  return String(station || "").trim();
+}
+
+function shortStation(station: string) {
+  const canonicalStation =
+    getStationFilterValue(station);
+
+  switch (canonicalStation) {
+    case "Station 1 & 2":
+      return "Station 1 & 2";
+
+    case "Admin Head":
+      return "Admin Head";
+
+    case "Quality Checking":
+      return "Quality Check";
+
+    case "Receiving & Pre-Print Formatting":
+      return "Pre-Print";
+
+    case "Running":
+      return "Running";
+
+    case "Numbering":
+      return "Numbering";
+
+    case "Collating":
+      return "Collating";
+
+    case "Stapling / Padding":
+      return "Stapling/Padding";
+
+    case "Cutting & Trimming":
+      return "Cutting";
+
+    case "Browning":
+      return "Browning";
+
+    case "Stamping":
+      return "Stamping";
+
+    case "Packaging & Labelling":
+      return "Packaging";
+
+    case "Finish Receipt":
+      return "Finish Receipt";
+
+    case "Ready for Release":
+      return "Ready Release";
+
+    default:
+      return station;
+  }
 }
 
 function getDaysBadge(days: number) {
@@ -300,8 +416,56 @@ function DocumentDetails({
   );
 }
 
-export default async function ProductionTrackerPage() {
+export default async function ProductionTrackerPage({
+  searchParams,
+}: ProductionTrackerPageProps) {
   const rows = await getTrackerRows();
+
+  const resolvedSearchParams =
+    await searchParams;
+
+  const searchText = String(
+    resolvedSearchParams.search || "",
+  ).trim();
+
+  const selectedStation = String(
+    resolvedSearchParams.station || "",
+  ).trim();
+
+  const normalizedSearch =
+    normalizeSearchValue(searchText);
+
+  const filteredRows = rows.filter((row) => {
+    if (normalizedSearch) {
+      const matchesTrackingNumber =
+        normalizeSearchValue(
+          row.trackingNo,
+        ).includes(normalizedSearch);
+
+      const matchesBusinessName =
+        normalizeSearchValue(
+          row.businessName,
+        ).includes(normalizedSearch);
+
+      if (
+        !matchesTrackingNumber &&
+        !matchesBusinessName
+      ) {
+        return false;
+      }
+    }
+
+    if (
+      selectedStation &&
+      getStationFilterValue(
+        row.currentStation,
+      ) !== selectedStation
+    ) {
+      return false;
+    }
+
+    return true;
+  });
 
   const rushCount = rows.filter(
     (row) =>
@@ -309,10 +473,11 @@ export default async function ProductionTrackerPage() {
       "rush",
   ).length;
 
-  const readyCount = rows.filter((row) =>
-    row.currentStation
-      ?.toUpperCase()
-      .includes("READY FOR RELEASE"),
+  const readyCount = rows.filter(
+    (row) =>
+      getStationFilterValue(
+        row.currentStation,
+      ) === "Ready for Release",
   ).length;
 
   const overdueCount = rows.filter(
@@ -322,6 +487,10 @@ export default async function ProductionTrackerPage() {
   const dueTodayCount = rows.filter(
     (row) => row.daysRemaining === 0,
   ).length;
+
+  const filtersApplied =
+    Boolean(searchText) ||
+    Boolean(selectedStation);
 
   return (
     <AppShell
@@ -377,6 +546,91 @@ export default async function ProductionTrackerPage() {
             Ready for Release: {readyCount}
           </span>
         </div>
+
+        <form
+          method="GET"
+          className="border-b border-[#eee4d6] bg-[#fbf7ef] p-5 sm:p-6"
+        >
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px_auto] lg:items-end">
+            <div>
+              <label
+                htmlFor="production-search"
+                className="mb-2 block text-sm font-black text-black"
+              >
+                Search
+              </label>
+
+              <input
+                id="production-search"
+                type="search"
+                name="search"
+                defaultValue={searchText}
+                placeholder="Tracking no. or business / trade name..."
+                className="h-11 w-full rounded-lg border border-[#d8cbb9] bg-white px-4 text-sm text-black outline-none transition placeholder:text-[#9a8d7d] focus:border-[#8b5e34] focus:ring-2 focus:ring-[#8b5e34]/10"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="station-filter"
+                className="mb-2 block text-sm font-black text-black"
+              >
+                Current Station
+              </label>
+
+              <select
+                id="station-filter"
+                name="station"
+                defaultValue={selectedStation}
+                className="h-11 w-full rounded-lg border border-[#d8cbb9] bg-white px-4 text-sm text-black outline-none transition focus:border-[#8b5e34] focus:ring-2 focus:ring-[#8b5e34]/10"
+              >
+                <option value="">
+                  All Stations
+                </option>
+
+                {STATION_FILTER_OPTIONS.map(
+                  (station) => (
+                    <option
+                      key={station}
+                      value={station}
+                    >
+                      {station}
+                    </option>
+                  ),
+                )}
+              </select>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-black px-5 text-sm font-black text-white transition hover:bg-[#6b421f] lg:flex-none"
+              >
+                Apply Filters
+              </button>
+
+              <Link
+                href="/production/tracker"
+                className="inline-flex h-11 flex-1 items-center justify-center rounded-lg border border-[#d5c6b2] bg-white px-5 text-sm font-black text-black transition hover:bg-[#f8f2e8] lg:flex-none"
+              >
+                Clear
+              </Link>
+            </div>
+          </div>
+
+          <p className="mt-4 text-sm text-[#6f6254]">
+            Showing{" "}
+            <span className="font-black text-black">
+              {filteredRows.length}
+            </span>{" "}
+            of{" "}
+            <span className="font-black text-black">
+              {rows.length}
+            </span>{" "}
+            production job
+            {rows.length === 1 ? "" : "s"}.
+          </p>
+        </form>
 
         <div className="max-h-[calc(100vh-390px)] min-h-[360px] overflow-auto">
           <table className="w-full min-w-[1450px] text-left text-sm">
@@ -441,17 +695,19 @@ export default async function ProductionTrackerPage() {
             </thead>
 
             <tbody>
-              {rows.length === 0 ? (
+              {filteredRows.length === 0 ? (
                 <tr>
                   <td
                     colSpan={14}
                     className="p-8 text-center text-[#6f6254]"
                   >
-                    No production records found.
+                    {rows.length === 0
+                      ? "No production records found."
+                      : "No production jobs match the selected search and station filter."}
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => {
+                filteredRows.map((row) => {
                   const daysBadge =
                     getDaysBadge(
                       row.daysRemaining,
@@ -476,12 +732,14 @@ export default async function ProductionTrackerPage() {
                       className="border-t border-[#eee4d6] align-top transition hover:bg-[#fbf7ef]"
                     >
                       <td className="p-4 font-bold">
-                        <a
-                          href={`/orders/printing/queue/${row.id}`}
+                        <Link
+                          href={`/orders/printing/queue/${encodeURIComponent(
+                            row.id,
+                          )}`}
                           className="text-[#9b6a22] hover:underline"
                         >
                           {row.trackingNo || "-"}
-                        </a>
+                        </Link>
                       </td>
 
                       <td className="w-[260px] p-4 font-bold text-black">
@@ -643,10 +901,27 @@ export default async function ProductionTrackerPage() {
             </tbody>
           </table>
         </div>
+
+        {filtersApplied && (
+          <div className="border-t border-[#eee4d6] bg-[#fffaf2] px-5 py-3 text-xs text-[#6f6254] sm:px-6">
+            Active filters:
+            {searchText && (
+              <span className="ml-2 rounded-md bg-white px-2 py-1 font-bold text-black">
+                Search: {searchText}
+              </span>
+            )}
+
+            {selectedStation && (
+              <span className="ml-2 rounded-md bg-white px-2 py-1 font-bold text-black">
+                Station: {selectedStation}
+              </span>
+            )}
+          </div>
+        )}
       </section>
 
       <footer className="mt-8 text-center text-xs text-[#7c6a56]">
-        © 2026 LIC Printing Shop. Production
+        © 2026 LIC Printing Corporation. Production
         Management System.
       </footer>
     </AppShell>

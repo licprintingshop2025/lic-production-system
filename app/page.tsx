@@ -367,7 +367,7 @@ export default async function Home() {
       </section>
 
       <footer className="mt-8 text-center text-xs text-[#7c6a56]">
-        © 2026 LIC Printing Shop. Production Management System.
+        © 2026 LIC Printing Corporation. Production Management System.
       </footer>
     </AppShell>
   );

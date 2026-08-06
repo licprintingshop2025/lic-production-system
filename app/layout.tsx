@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LIC Printing Shop | Production System",
-  description: "Production management system for LIC Printing Shop",
+  title: "LIC Printing Corp. | Production System",
+  description: "Production management system for LIC Printing Corporation",
   icons: {
     icon: "/favicon.ico",
   },

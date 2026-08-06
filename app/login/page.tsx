@@ -39,8 +39,8 @@ export default function LoginPage() {
             <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.16),transparent_34%),linear-gradient(135deg,#FAF7F2_0%,#F5EFE4_100%)] px-5 py-12">
                 <div className="w-full max-w-sm rounded-[28px] bg-white px-8 py-9 shadow-[0_20px_60px_rgba(0,0,0,0.08)] ring-1 ring-[#E8D7A6]">
                     <div className="flex flex-col items-center text-center">
-                        <Image src="/lic-logo.jpg" alt="LIC Printing Shop" width={64} height={64} className="rounded" priority />
-                        <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.35em] text-[#C9A227]">LIC Printing Shop</p>
+                        <Image src="/lic-logo-new.jpg" alt="LIC Printing Corporation" width={64} height={64} className="rounded" priority />
+                        <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.35em] text-[#C9A227]">LIC Printing Corporation</p>
                         <h1 className="mt-1 text-2xl font-bold leading-tight text-[#4A2A1A]">Operations Center</h1>
                         <p className="mt-2 text-sm leading-relaxed text-gray-500">Sign in to view production</p>
                     </div>

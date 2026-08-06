@@ -1,16 +1,17 @@
 "use client";
 
+import AppShell from "@/app/components/AppShell";
+import PageHeader from "@/app/components/PageHeader";
 import { useParams, useRouter } from "next/navigation";
 import {
-  useEffect,
-  useMemo,
-  useState,
   type ChangeEvent,
   type ChangeEventHandler,
   type FormEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
 } from "react";
-import AppShell from "@/app/components/AppShell";
-import PageHeader from "@/app/components/PageHeader";
 
 type DeliveryStrategy = "COMPLETE" | "PARTIAL";
 
@@ -95,6 +96,9 @@ const SIZE_OPTIONS = [
   "Whole",
   "Other",
 ];
+
+const inputClassName =
+  "h-12 w-full rounded-lg border border-[#d8cbb9] bg-white px-4 text-sm text-black outline-none transition placeholder:text-[#9a8d7d] focus:border-[#8b5e34] focus:ring-2 focus:ring-[#8b5e34]/10 disabled:cursor-not-allowed disabled:bg-[#f4f1ec] disabled:text-[#7c7165]";
 
 function cleanValue(input: unknown) {
   if (input === null || input === undefined) {
@@ -198,7 +202,6 @@ export default function CompleteProductionDetailsPage() {
   const [formData, setFormData] =
     useState<OrderFormData>({
       orderPriority: "",
-
       deliveryStrategy: "COMPLETE",
       initialReleaseQty: "10",
       initialDueWorkingDays: "10",
@@ -210,6 +213,7 @@ export default function CompleteProductionDetailsPage() {
   >([]);
 
   const [cardName, setCardName] = useState("");
+
   const [sourceType, setSourceType] = useState<
     "BIR" | "NON_BIR" | ""
   >("");
@@ -220,7 +224,8 @@ export default function CompleteProductionDetailsPage() {
   const [submitting, setSubmitting] =
     useState(false);
 
-  const [loadError, setLoadError] = useState("");
+  const [loadError, setLoadError] =
+    useState("");
 
   useEffect(() => {
     if (!cardId) {
@@ -237,7 +242,9 @@ export default function CompleteProductionDetailsPage() {
         setLoadError("");
 
         const response = await fetch(
-          `/api/production/${cardId}`,
+          `/api/production/${encodeURIComponent(
+            cardId,
+          )}`,
           {
             method: "GET",
             cache: "no-store",
@@ -357,9 +364,9 @@ export default function CompleteProductionDetailsPage() {
 
   function handleOrderChange(
     event: ChangeEvent<
-      HTMLInputElement |
-        HTMLSelectElement |
-        HTMLTextAreaElement
+      | HTMLInputElement
+      | HTMLSelectElement
+      | HTMLTextAreaElement
     >,
   ) {
     const { name, value } = event.target;
@@ -427,14 +434,11 @@ export default function CompleteProductionDetailsPage() {
 
         return {
           ...document,
-          paperType:
-            previousDocument.paperType,
+          paperType: previousDocument.paperType,
           ply: previousDocument.ply,
-          customPly:
-            previousDocument.customPly,
+          customPly: previousDocument.customPly,
           size: previousDocument.size,
-          customSize:
-            previousDocument.customSize,
+          customSize: previousDocument.customSize,
           specialInstructions:
             previousDocument.specialInstructions,
         };
@@ -458,14 +462,11 @@ export default function CompleteProductionDetailsPage() {
 
           return {
             ...document,
-            paperType:
-              firstDocument.paperType,
+            paperType: firstDocument.paperType,
             ply: firstDocument.ply,
-            customPly:
-              firstDocument.customPly,
+            customPly: firstDocument.customPly,
             size: firstDocument.size,
-            customSize:
-              firstDocument.customSize,
+            customSize: firstDocument.customSize,
             specialInstructions:
               firstDocument.specialInstructions,
           };
@@ -585,6 +586,10 @@ export default function CompleteProductionDetailsPage() {
   ) {
     event.preventDefault();
 
+    if (submitting) {
+      return;
+    }
+
     const validationError = validateForm();
 
     if (validationError) {
@@ -595,8 +600,8 @@ export default function CompleteProductionDetailsPage() {
     setSubmitting(true);
 
     try {
-      const normalizedDocuments = documents.map(
-        (document) => ({
+      const normalizedDocuments =
+        documents.map((document) => ({
           id: document.id,
           documentType:
             document.documentType,
@@ -619,8 +624,7 @@ export default function CompleteProductionDetailsPage() {
 
           specialInstructions:
             document.specialInstructions.trim(),
-        }),
-      );
+        }));
 
       const payload = {
         orderPriority:
@@ -648,7 +652,9 @@ export default function CompleteProductionDetailsPage() {
       };
 
       const response = await fetch(
-        `/api/production/${cardId}`,
+        `/api/production/${encodeURIComponent(
+          cardId,
+        )}`,
         {
           method: "PUT",
           headers: {
@@ -659,9 +665,10 @@ export default function CompleteProductionDetailsPage() {
         },
       );
 
-      const result = (await response.json()) as {
-        error?: string;
-      };
+      const result =
+        (await response.json()) as {
+          error?: string;
+        };
 
       if (!response.ok) {
         alert(
@@ -681,7 +688,12 @@ export default function CompleteProductionDetailsPage() {
         "Production details saved and card moved to Station 4.",
       );
 
-      router.push(`/orders/printing/queue/${cardId}`);
+      router.push(
+        `/orders/printing/queue/${encodeURIComponent(
+          cardId,
+        )}`,
+      );
+
       router.refresh();
     } catch (error) {
       alert(
@@ -704,17 +716,22 @@ export default function CompleteProductionDetailsPage() {
         contentWidth="standard"
       >
         <PageHeader
+          eyebrow="Orders / Printing / Queue"
           title="Complete Production Details"
           description="Loading the order documents and current production details."
         />
 
-        <div className="mt-8 rounded-2xl border border-[#e3d8c7] bg-white p-10 text-center shadow-[0_2px_10px_rgba(70,45,20,0.08)]">
-          <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#eadfcf] border-t-[#c89132]" />
+        <section className="mt-7 rounded-2xl border border-[#e3d8c7] bg-white p-10 text-center shadow-sm">
+          <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#eadfcf] border-t-black" />
 
-          <p className="mt-4 text-sm font-semibold text-[#6f6254]">
+          <p className="mt-4 text-sm font-black text-black">
             Loading production details...
           </p>
-        </div>
+
+          <p className="mt-2 text-sm text-[#6f6254]">
+            Please wait while the order is retrieved.
+          </p>
+        </section>
       </AppShell>
     );
   }
@@ -726,11 +743,12 @@ export default function CompleteProductionDetailsPage() {
         contentWidth="standard"
       >
         <PageHeader
+          eyebrow="Orders / Printing / Queue"
           title="Complete Production Details"
           description="The production details could not be loaded."
         />
 
-        <div className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-6">
+        <section className="mt-7 rounded-2xl border border-red-200 bg-red-50 p-6 shadow-sm">
           <h2 className="font-black text-red-900">
             Unable to load this order
           </h2>
@@ -745,7 +763,7 @@ export default function CompleteProductionDetailsPage() {
               onClick={() =>
                 window.location.reload()
               }
-              className="rounded-xl bg-red-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-red-800"
+              className="inline-flex h-11 items-center justify-center rounded-lg bg-red-700 px-5 text-sm font-black text-white transition hover:bg-red-800"
             >
               Try Again
             </button>
@@ -753,14 +771,16 @@ export default function CompleteProductionDetailsPage() {
             <button
               type="button"
               onClick={() =>
-                router.push("/orders/printing/queue")
+                router.push(
+                  "/orders/printing/queue",
+                )
               }
-              className="rounded-xl border border-red-200 bg-white px-5 py-3 text-sm font-bold text-red-800 transition hover:bg-red-100"
+              className="inline-flex h-11 items-center justify-center rounded-lg border border-red-200 bg-white px-5 text-sm font-black text-red-800 transition hover:bg-red-100"
             >
-              Return to Production
+              Return to Queue
             </button>
           </div>
-        </div>
+        </section>
       </AppShell>
     );
   }
@@ -771,33 +791,51 @@ export default function CompleteProductionDetailsPage() {
       contentWidth="standard"
     >
       <PageHeader
+        eyebrow="Orders / Printing / Queue"
         title="Complete Production Details"
         description="Define the order handling and individual specifications for every document before sending this job to Station 4."
       />
 
+      <div className="mt-6">
+        <button
+          type="button"
+          onClick={() =>
+            router.push(
+              "/orders/printing/queue",
+            )
+          }
+          disabled={submitting}
+          className="text-sm font-bold text-[#6b421f] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          ← Back to Production Queue
+        </button>
+      </div>
+
       {(cardName || sourceType) && (
-        <section className="mt-5 rounded-2xl border border-[#e3d8c7] bg-[#fffaf2] p-5 shadow-[0_2px_10px_rgba(70,45,20,0.05)]">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <section className="mt-6 overflow-hidden rounded-2xl border border-[#e3d8c7] bg-white shadow-sm">
+          <div className="flex flex-col gap-4 bg-[#fbf7ef] px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-[#8b5e24]">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[#6b421f]">
                 Current Order
               </p>
 
-              <h2 className="mt-1 text-lg font-black text-black">
-                {cardName || "Production Order"}
+              <h2 className="mt-2 text-lg font-black leading-6 text-black">
+                {cardName ||
+                  "Production Order"}
               </h2>
             </div>
 
             <div className="flex flex-wrap gap-2">
               {sourceType && (
-                <span className="rounded-full border border-[#dfd4c4] bg-white px-3 py-2 text-xs font-bold text-[#6f6254]">
-                  {sourceType === "NON_BIR"
+                <span className="inline-flex h-9 items-center rounded-lg border border-[#d8cbb9] bg-white px-3 text-xs font-black text-[#6b421f]">
+                  {sourceType ===
+                  "NON_BIR"
                     ? "Non-BIR"
                     : "BIR"}
                 </span>
               )}
 
-              <span className="rounded-full bg-[#f8ead3] px-3 py-2 text-xs font-black text-[#8b5e24]">
+              <span className="inline-flex h-9 items-center rounded-lg bg-black px-3 text-xs font-black text-white">
                 {documents.length}{" "}
                 {documents.length === 1
                   ? "Document"
@@ -810,16 +848,14 @@ export default function CompleteProductionDetailsPage() {
 
       <form
         onSubmit={handleSubmit}
-        className="mt-8 space-y-6"
+        className="mt-7 space-y-6"
       >
-        <section className="rounded-2xl border border-[#e3d8c7] bg-white p-6 shadow-[0_2px_10px_rgba(70,45,20,0.08)]">
-          <SectionHeading
-            number="01"
-            title="Order Handling"
-            description="Define the priority and delivery strategy for the entire order."
-          />
-
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <FormSection
+          number="1"
+          title="Order Handling"
+          description="Define the priority and delivery strategy for the entire order."
+        >
+          <div className="grid gap-5 md:grid-cols-2">
             <Select
               label="Order Priority"
               name="orderPriority"
@@ -839,6 +875,7 @@ export default function CompleteProductionDetailsPage() {
               onChange={
                 handleOrderChange
               }
+              disabled={submitting}
               required
             />
 
@@ -861,6 +898,7 @@ export default function CompleteProductionDetailsPage() {
               onChange={
                 handleOrderChange
               }
+              disabled={submitting}
               required
             />
 
@@ -877,6 +915,7 @@ export default function CompleteProductionDetailsPage() {
                   onChange={
                     handleOrderChange
                   }
+                  disabled={submitting}
                   required
                 />
 
@@ -890,6 +929,7 @@ export default function CompleteProductionDetailsPage() {
                   onChange={
                     handleOrderChange
                   }
+                  disabled={submitting}
                   required
                 />
 
@@ -903,27 +943,26 @@ export default function CompleteProductionDetailsPage() {
                   onChange={
                     handleOrderChange
                   }
+                  disabled={submitting}
                   required
                 />
               </>
             )}
           </div>
-        </section>
+        </FormSection>
 
-        <section className="rounded-2xl border border-[#e3d8c7] bg-white p-6 shadow-[0_2px_10px_rgba(70,45,20,0.08)]">
-          <SectionHeading
-            number="02"
-            title="Document Specifications"
-            description="Complete the paper type, ply, size, and instructions for every document included in this order."
-          />
-
-          <div className="mb-6 flex flex-col gap-4 rounded-xl border border-[#eadfcf] bg-[#fffaf2] px-5 py-4 md:flex-row md:items-center md:justify-between">
+        <FormSection
+          number="2"
+          title="Document Specifications"
+          description="Complete the paper type, ply, size, and instructions for every document included in this order."
+        >
+          <div className="mb-6 flex flex-col gap-4 rounded-xl border border-[#e3d8c7] bg-[#fbf7ef] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-black text-black">
                 Specification Progress
               </p>
 
-              <p className="mt-1 text-xs text-[#6f6254]">
+              <p className="mt-1 text-xs leading-5 text-[#6f6254]">
                 All required document specifications
                 must be completed before saving.
               </p>
@@ -938,20 +977,19 @@ export default function CompleteProductionDetailsPage() {
                   }
                   disabled={
                     submitting ||
-                    !documents[0]
-                      ?.paperType
+                    !documents[0]?.paperType
                   }
-                  className="rounded-xl border border-[#dfd4c4] bg-white px-4 py-2 text-xs font-bold text-[#3f352a] transition hover:bg-[#fbf7ef] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-10 items-center justify-center rounded-lg border border-[#cfc1ae] bg-white px-4 text-xs font-black text-black transition hover:bg-[#f8f2e8] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Apply First Document to All
                 </button>
               )}
 
               <span
-                className={`rounded-full px-4 py-2 text-xs font-black ${
+                className={`inline-flex h-10 items-center rounded-lg px-4 text-xs font-black ${
                   allDocumentsComplete
                     ? "bg-green-100 text-green-800"
-                    : "bg-[#f8ead3] text-[#8b5e24]"
+                    : "bg-[#f3eadc] text-[#6b421f]"
                 }`}
               >
                 {completedDocumentCount} of{" "}
@@ -961,12 +999,12 @@ export default function CompleteProductionDetailsPage() {
           </div>
 
           {documents.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[#d6c4aa] bg-[#fffaf2] p-8 text-center">
+            <div className="rounded-xl border border-dashed border-[#d8cbb9] bg-[#fbf7ef] p-8 text-center">
               <p className="font-black text-black">
                 No documents found
               </p>
 
-              <p className="mt-2 text-sm text-[#6f6254]">
+              <p className="mt-2 text-sm leading-6 text-[#6f6254]">
                 This order does not contain a
                 recognised document list. Check the
                 source Google Sheet record before
@@ -981,6 +1019,7 @@ export default function CompleteProductionDetailsPage() {
                     key={document.id}
                     document={document}
                     index={index}
+                    disabled={submitting}
                     onChange={
                       updateDocument
                     }
@@ -992,16 +1031,16 @@ export default function CompleteProductionDetailsPage() {
               )}
             </div>
           )}
-        </section>
+        </FormSection>
 
-        <section className="rounded-2xl border border-[#e3d8c7] bg-[#fffaf2] p-5 shadow-[0_2px_10px_rgba(70,45,20,0.06)]">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <section className="rounded-2xl border border-[#e3d8c7] bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-bold text-black">
+              <p className="text-sm font-black text-black">
                 Next Step
               </p>
 
-              <p className="mt-1 text-sm text-[#6f6254]">
+              <p className="mt-1 text-sm leading-6 text-[#6f6254]">
                 Saving will update the Trello
                 description, labels, due date and
                 checklist, then move the card to
@@ -1009,71 +1048,113 @@ export default function CompleteProductionDetailsPage() {
               </p>
             </div>
 
-            <span className="rounded-xl bg-[#f8ead3] px-4 py-2 text-sm font-black text-[#8b5e24]">
+            <span className="inline-flex h-10 shrink-0 items-center rounded-lg bg-black px-4 text-sm font-black text-white">
               Station 4
             </span>
           </div>
         </section>
 
-        <div className="mt-8 border-t border-[#e3d8c7] bg-[#fffaf2] px-6 py-5 lg:px-8">
-          <div className="mx-auto flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-[#7c6a56]">
-              Review every document before sending
-              this order to production.
-            </p>
+        <section className="flex flex-col gap-5 rounded-2xl border border-[#e3d8c7] bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-2xl text-xs leading-5 text-[#7c6a56]">
+            Review every document before
+            sending this order to production.
+          </p>
 
-            <div className="flex shrink-0 justify-end gap-3">
-              <button
-                type="button"
-                onClick={() =>
-                  router.push("/orders/printing/queue")
-                }
-                disabled={submitting}
-                className="rounded-xl border border-[#dfd4c4] bg-white px-6 py-3 text-sm font-bold text-[#3f352a] transition hover:bg-[#fbf7ef] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Cancel
-              </button>
+          <div className="flex shrink-0 flex-col-reverse gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  "/orders/printing/queue",
+                )
+              }
+              disabled={submitting}
+              className="inline-flex h-12 items-center justify-center rounded-lg border border-[#cfc1ae] bg-white px-6 text-sm font-black text-black transition hover:bg-[#f8f2e8] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
 
-              <button
-                type="submit"
-                disabled={
-                  submitting ||
-                  documents.length === 0 ||
-                  !allDocumentsComplete
-                }
-                className="rounded-xl bg-[#e1bb5f] px-8 py-3 text-sm font-black text-black transition hover:bg-[#edca73] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {submitting
-                  ? "Saving..."
-                  : "Save & Send to Station 4"}
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={
+                submitting ||
+                documents.length === 0 ||
+                !allDocumentsComplete
+              }
+              className="inline-flex h-12 min-w-56 items-center justify-center rounded-lg bg-black px-7 text-sm font-black text-white transition hover:bg-[#6b421f] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {submitting
+                ? "Saving..."
+                : "Save & Send to Station 4"}
+            </button>
           </div>
-        </div>
+        </section>
       </form>
 
       <footer className="mt-10 text-center text-xs text-[#7c6a56]">
-        © 2026 LIC Printing Shop. Production
+        © 2026 LIC Printing Corporation. Production
         Management System.
       </footer>
     </AppShell>
   );
 }
 
+function FormSection({
+  number,
+  title,
+  description,
+  children,
+}: {
+  number: string;
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="overflow-visible rounded-2xl border border-[#e3d8c7] bg-white shadow-sm">
+      <div className="rounded-t-2xl border-b border-[#eee5d8] bg-[#fbf7ef] px-5 py-4 sm:px-7">
+        <div className="flex items-start gap-4">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black text-sm font-black text-white">
+            {number}
+          </div>
+
+          <div>
+            <h2 className="text-lg font-black text-black">
+              {title}
+            </h2>
+
+            <p className="mt-1 text-sm leading-6 text-[#6f6254]">
+              {description}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-5 sm:p-7">
+        {children}
+      </div>
+    </section>
+  );
+}
+
 function DocumentSpecificationCard({
   document,
   index,
+  disabled,
   onChange,
   onCopyPrevious,
 }: {
   document: OrderDocument;
   index: number;
+  disabled: boolean;
   onChange: (
     documentId: string,
     field: keyof OrderDocument,
     value: string,
   ) => void;
-  onCopyPrevious: (documentId: string) => void;
+  onCopyPrevious: (
+    documentId: string,
+  ) => void;
 }) {
   const finalPly =
     document.ply === "Other"
@@ -1092,16 +1173,16 @@ function DocumentSpecificationCard({
   );
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-[#e3d8c7] bg-[#fffdf9]">
-      <div className="border-b border-[#eadfcf] bg-[#fff8ec] px-5 py-4">
+    <article className="overflow-hidden rounded-xl border border-[#e3d8c7] bg-[#fffdf9]">
+      <div className="border-b border-[#eee5d8] bg-[#fbf7ef] px-5 py-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#e1bb5f] text-xs font-black text-black">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black text-xs font-black text-white">
               {index + 1}
             </div>
 
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-[#8b5e24]">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-[#6b421f]">
                 Document {index + 1}
               </p>
 
@@ -1127,7 +1208,7 @@ function DocumentSpecificationCard({
             )}
 
             <span
-              className={`rounded-full px-3 py-2 text-xs font-black ${
+              className={`inline-flex h-9 items-center rounded-lg px-3 text-xs font-black ${
                 isComplete
                   ? "bg-green-100 text-green-800"
                   : "bg-amber-100 text-amber-800"
@@ -1144,16 +1225,19 @@ function DocumentSpecificationCard({
           <button
             type="button"
             onClick={() =>
-              onCopyPrevious(document.id)
+              onCopyPrevious(
+                document.id,
+              )
             }
-            className="mt-4 rounded-lg border border-[#dfd4c4] bg-white px-3 py-2 text-xs font-bold text-[#3f352a] transition hover:bg-[#fbf7ef]"
+            disabled={disabled}
+            className="mt-4 inline-flex h-9 items-center justify-center rounded-lg border border-[#cfc1ae] bg-white px-3 text-xs font-black text-black transition hover:bg-[#f8f2e8] disabled:cursor-not-allowed disabled:opacity-50"
           >
             Copy Previous Document
           </button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-5 p-5 md:grid-cols-2">
+      <div className="grid gap-5 p-5 md:grid-cols-2">
         <Select
           label="Paper Type"
           name={`paperType-${document.id}`}
@@ -1171,17 +1255,14 @@ function DocumentSpecificationCard({
               event.target.value,
             )
           }
+          disabled={disabled}
           required
         />
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-[#3f352a]">
-            Ply{" "}
-            <span className="text-red-500">
-              *
-            </span>
-          </label>
-
+        <Field
+          label="Ply"
+          required
+        >
           <select
             name={`ply-${document.id}`}
             value={document.ply}
@@ -1192,19 +1273,24 @@ function DocumentSpecificationCard({
                 event.target.value,
               )
             }
+            disabled={disabled}
             required
-            className="w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
+            className={inputClassName}
           >
-            <option value="">Select</option>
+            <option value="">
+              Select
+            </option>
 
-            {PLY_OPTIONS.map((option) => (
-              <option
-                key={option}
-                value={option}
-              >
-                {option}
-              </option>
-            ))}
+            {PLY_OPTIONS.map(
+              (option) => (
+                <option
+                  key={option}
+                  value={option}
+                >
+                  {option}
+                </option>
+              ),
+            )}
           </select>
 
           {document.ply === "Other" && (
@@ -1219,21 +1305,18 @@ function DocumentSpecificationCard({
                   event.target.value,
                 )
               }
+              disabled={disabled}
               required
               placeholder="Enter custom ply"
-              className="mt-3 w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition placeholder:text-[#a99b8c] focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
+              className={`${inputClassName} mt-3`}
             />
           )}
-        </div>
+        </Field>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-[#3f352a]">
-            Size{" "}
-            <span className="text-red-500">
-              *
-            </span>
-          </label>
-
+        <Field
+          label="Size"
+          required
+        >
           <select
             name={`size-${document.id}`}
             value={document.size}
@@ -1244,19 +1327,24 @@ function DocumentSpecificationCard({
                 event.target.value,
               )
             }
+            disabled={disabled}
             required
-            className="w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
+            className={inputClassName}
           >
-            <option value="">Select</option>
+            <option value="">
+              Select
+            </option>
 
-            {SIZE_OPTIONS.map((option) => (
-              <option
-                key={option}
-                value={option}
-              >
-                {option}
-              </option>
-            ))}
+            {SIZE_OPTIONS.map(
+              (option) => (
+                <option
+                  key={option}
+                  value={option}
+                >
+                  {option}
+                </option>
+              ),
+            )}
           </select>
 
           {document.size === "Other" && (
@@ -1271,65 +1359,37 @@ function DocumentSpecificationCard({
                   event.target.value,
                 )
               }
+              disabled={disabled}
               required
               placeholder="Enter custom size"
-              className="mt-3 w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition placeholder:text-[#a99b8c] focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
+              className={`${inputClassName} mt-3`}
             />
           )}
-        </div>
+        </Field>
 
         <div className="md:col-span-2">
-          <label className="mb-2 block text-sm font-semibold text-[#3f352a]">
-            Special Instructions
-          </label>
-
-          <textarea
-            name={`specialInstructions-${document.id}`}
-            value={
-              document.specialInstructions
-            }
-            onChange={(event) =>
-              onChange(
-                document.id,
-                "specialInstructions",
-                event.target.value,
-              )
-            }
-            rows={3}
-            placeholder={`Enter special instructions for ${document.documentType}.`}
-            className="w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition placeholder:text-[#a99b8c] focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
-          />
+          <Field label="Special Instructions">
+            <textarea
+              name={`specialInstructions-${document.id}`}
+              value={
+                document.specialInstructions
+              }
+              onChange={(event) =>
+                onChange(
+                  document.id,
+                  "specialInstructions",
+                  event.target.value,
+                )
+              }
+              disabled={disabled}
+              rows={3}
+              placeholder={`Enter special instructions for ${document.documentType}.`}
+              className={`${inputClassName} h-auto min-h-24 py-3`}
+            />
+          </Field>
         </div>
       </div>
     </article>
-  );
-}
-
-function SectionHeading({
-  number,
-  title,
-  description,
-}: {
-  number: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="mb-6 flex items-start gap-4">
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#f8ead3] text-sm font-black text-[#8b5e24]">
-        {number}
-      </div>
-
-      <div>
-        <h2 className="text-xl font-black text-black">
-          {title}
-        </h2>
-
-        <p className="mt-1 text-sm text-[#6f6254]">
-          {description}
-        </p>
-      </div>
-    </div>
   );
 }
 
@@ -1341,12 +1401,41 @@ function MetadataBadge({
   value: string;
 }) {
   return (
-    <span className="rounded-lg border border-[#e3d8c7] bg-white px-3 py-2 text-xs text-[#6f6254]">
-      <span className="font-bold text-[#3f352a]">
+    <span className="inline-flex h-9 items-center rounded-lg border border-[#e3d8c7] bg-white px-3 text-xs text-[#6f6254]">
+      <span className="font-black text-black">
         {label}:
-      </span>{" "}
-      {value}
+      </span>
+
+      <span className="ml-1">
+        {value}
+      </span>
     </span>
+  );
+}
+
+function Field({
+  label,
+  required = false,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-black text-black">
+        {label}
+
+        {required && (
+          <span className="ml-1 text-red-600">
+            *
+          </span>
+        )}
+      </span>
+
+      {children}
+    </label>
   );
 }
 
@@ -1356,6 +1445,7 @@ function Input({
   value,
   type = "text",
   required = false,
+  disabled = false,
   onChange,
 }: {
   label: string;
@@ -1363,31 +1453,29 @@ function Input({
   value: string;
   type?: string;
   required?: boolean;
+  disabled?: boolean;
   onChange: ChangeEventHandler<HTMLInputElement>;
 }) {
   return (
-    <div>
-      <label className="mb-2 block text-sm font-semibold text-[#3f352a]">
-        {label}{" "}
-        {required && (
-          <span className="text-red-500">
-            *
-          </span>
-        )}
-      </label>
-
+    <Field
+      label={label}
+      required={required}
+    >
       <input
         name={name}
         type={type}
         value={value}
         required={required}
+        disabled={disabled}
         onChange={onChange}
         min={
-          type === "number" ? 1 : undefined
+          type === "number"
+            ? 1
+            : undefined
         }
-        className="w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
+        className={inputClassName}
       />
-    </div>
+    </Field>
   );
 }
 
@@ -1397,6 +1485,7 @@ function Select({
   value,
   options,
   required = false,
+  disabled = false,
   onChange,
 }: {
   label: string;
@@ -1404,27 +1493,25 @@ function Select({
   value: string;
   options: SelectOption[];
   required?: boolean;
+  disabled?: boolean;
   onChange: ChangeEventHandler<HTMLSelectElement>;
 }) {
   return (
-    <div>
-      <label className="mb-2 block text-sm font-semibold text-[#3f352a]">
-        {label}{" "}
-        {required && (
-          <span className="text-red-500">
-            *
-          </span>
-        )}
-      </label>
-
+    <Field
+      label={label}
+      required={required}
+    >
       <select
         name={name}
         value={value}
         required={required}
+        disabled={disabled}
         onChange={onChange}
-        className="w-full rounded-xl border border-[#dfd4c4] bg-white p-3 text-black outline-none transition focus:border-[#c89132] focus:ring-2 focus:ring-[#f4dfb9]"
+        className={inputClassName}
       >
-        <option value="">Select</option>
+        <option value="">
+          Select
+        </option>
 
         {options.map((option) => (
           <option
@@ -1435,6 +1522,6 @@ function Select({
           </option>
         ))}
       </select>
-    </div>
+    </Field>
   );
 }

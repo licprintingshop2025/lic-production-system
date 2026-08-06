@@ -138,8 +138,8 @@ function MobileHeader({
     <header className="flex shrink-0 items-center justify-between border-b border-[#e3d8c7] bg-[#fffaf2] px-4 py-3 lg:hidden">
       <div className="flex items-center gap-3">
         <Image
-          src="/lic-logo.jpg"
-          alt="LIC Printing Shop"
+          src="/lic-logo-new.jpg"
+          alt="LIC Printing Corporation"
           width={56}
           height={42}
           className="h-auto w-[56px] rounded-md object-contain"
@@ -321,8 +321,8 @@ function SidebarContent({
       <div className="shrink-0 px-5 pt-5">
         <div className="mx-auto w-[160px] overflow-hidden rounded-lg">
           <Image
-            src="/lic-logo.jpg"
-            alt="LIC Printing Shop"
+            src="/lic-logo-new.jpg"
+            alt="LIC Printing Corporation"
             width={160}
             height={120}
             className="h-auto w-full object-contain"

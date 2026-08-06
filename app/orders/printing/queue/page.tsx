@@ -1,6 +1,7 @@
-import Link from "next/link";
 import AppShell from "@/app/components/AppShell";
 import PageHeader from "@/app/components/PageHeader";
+import Link from "next/link";
+
 type TrelloCard = {
   id: string;
   name: string;
@@ -18,24 +19,48 @@ type QueueCard = TrelloCard & {
   type: "ATP" | "Non-BIR";
 };
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const BASE_URL =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  "http://localhost:3000";
 
-async function getLists() {
-  const res = await fetch(`${BASE_URL}/api/trello/lists`, {
-    cache: "no-store",
-  });
+async function getLists(): Promise<TrelloList[]> {
+  const response = await fetch(
+    `${BASE_URL}/api/trello/lists`,
+    {
+      cache: "no-store",
+    },
+  );
 
-  if (!res.ok) return [];
+  if (!response.ok) {
+    return [];
+  }
 
-  const data = await res.json();
-  return data.lists as TrelloList[];
+  const data = (await response.json()) as {
+    lists?: TrelloList[];
+  };
+
+  return Array.isArray(data.lists)
+    ? data.lists
+    : [];
 }
 
-function getQueueType(listName: string): "ATP" | "Non-BIR" | null {
-  const name = listName.toUpperCase().trim();
+function getQueueType(
+  listName: string,
+): "ATP" | "Non-BIR" | null {
+  const name = listName
+    .toUpperCase()
+    .trim();
 
-  if (name === "ATP INTAKE") return "ATP";
-  if (name === "NON-BIR INTAKE" || name === "NON BIR INTAKE") return "Non-BIR";
+  if (name === "ATP INTAKE") {
+    return "ATP";
+  }
+
+  if (
+    name === "NON-BIR INTAKE" ||
+    name === "NON BIR INTAKE"
+  ) {
+    return "Non-BIR";
+  }
 
   return null;
 }
@@ -43,75 +68,130 @@ function getQueueType(listName: string): "ATP" | "Non-BIR" | null {
 export default async function ProductionPage() {
   const lists = await getLists();
 
-  const cards: QueueCard[] = lists.flatMap((list) => {
-    const type = getQueueType(list.name);
+  const cards: QueueCard[] =
+    lists.flatMap((list) => {
+      const type = getQueueType(
+        list.name,
+      );
 
-    if (!type) return [];
+      if (!type) {
+        return [];
+      }
 
-    return (list.cards || []).map((card) => ({
-      ...card,
-      type,
-    }));
-  });
+      return (list.cards || []).map(
+        (card) => ({
+          ...card,
+          type,
+        }),
+      );
+    });
 
-  const atpCount = cards.filter((card) => card.type === "ATP").length;
-  const nonBirCount = cards.filter((card) => card.type === "Non-BIR").length;
+  const atpCount = cards.filter(
+    (card) => card.type === "ATP",
+  ).length;
+
+  const nonBirCount = cards.filter(
+    (card) =>
+      card.type === "Non-BIR",
+  ).length;
 
   return (
-    <AppShell activePage="production" contentWidth="standard">
+    <AppShell
+      activePage="production"
+      contentWidth="standard"
+    >
       <PageHeader
+        eyebrow="Orders / Printing"
         title="Production Details Queue"
         description="ATP and Non-BIR intake cards waiting for production details before moving to Station 4."
       />
 
-      <section className="mt-8 rounded-2xl border border-[#e3d8c7] bg-white p-6 shadow-[0_2px_10px_rgba(70,45,20,0.08)]">
-        <div className="mb-5 flex flex-col justify-between gap-3 md:flex-row md:items-center">
+      <section className="mt-7 overflow-hidden rounded-2xl border border-[#e3d8c7] bg-white shadow-sm">
+        <div className="flex flex-col justify-between gap-5 border-b border-[#eee5d8] bg-[#fbf7ef] px-5 py-5 sm:px-7 lg:flex-row lg:items-center">
           <div>
-            <h2 className="text-xl font-black text-black">Intake Cards</h2>
-            <p className="mt-1 text-sm text-[#6f6254]">
-              {cards.length} card(s) waiting for production details.
+            <h2 className="text-xl font-black text-black">
+              Intake Cards
+            </h2>
+
+            <p className="mt-1 text-sm leading-6 text-[#6f6254]">
+              {cards.length} card
+              {cards.length === 1
+                ? ""
+                : "s"}{" "}
+              waiting for production
+              details.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <span className="rounded-xl border border-[#e3d8c7] bg-[#fbf7ef] px-4 py-2 text-sm font-bold text-[#8b5e24]">
-              ATP: {atpCount}
-            </span>
+            <QueueBadge
+              label="ATP"
+              value={atpCount}
+            />
 
-            <span className="rounded-xl border border-[#e3d8c7] bg-[#fbf7ef] px-4 py-2 text-sm font-bold text-[#8b5e24]">
-              Non-BIR: {nonBirCount}
-            </span>
+            <QueueBadge
+              label="Non-BIR"
+              value={nonBirCount}
+            />
 
-            <span className="rounded-xl border border-[#e3d8c7] bg-[#fbf7ef] px-4 py-2 text-sm font-bold text-[#8b5e24]">
-              Queue: {cards.length}
-            </span>
+            <QueueBadge
+              label="Queue"
+              value={cards.length}
+              emphasized
+            />
           </div>
         </div>
 
         {cards.length === 0 ? (
-          <div className="rounded-xl border border-[#eee4d6] bg-[#fbf7ef] p-6 text-sm text-[#6f6254]">
-            No cards waiting for production details.
+          <div className="p-5 sm:p-7">
+            <div className="rounded-xl border border-dashed border-[#d8cbb9] bg-[#fbf7ef] p-8 text-center">
+              <p className="text-sm font-black text-black">
+                No cards waiting for
+                production details.
+              </p>
+
+              <p className="mt-2 text-sm text-[#6f6254]">
+                New ATP and Non-BIR
+                intake cards will appear
+                here automatically.
+              </p>
+            </div>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-[#eee4d6]">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-[#fbf7ef] text-[#6f6254]">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[950px] text-left text-sm">
+              <thead className="bg-[#fffdf9] text-[#5f5448]">
                 <tr>
-                  <th className="p-4">Type</th>
-                  <th className="p-4">Card Name</th>
-                  <th className="p-4">Card ID</th>
-                  <th className="p-4 text-right">Actions</th>
+                  <TableHeader>
+                    Type
+                  </TableHeader>
+
+                  <TableHeader>
+                    Card Name
+                  </TableHeader>
+
+                  <TableHeader>
+                    Card ID
+                  </TableHeader>
+
+                  <TableHeader right>
+                    Actions
+                  </TableHeader>
                 </tr>
               </thead>
 
               <tbody>
                 {cards.map((card) => (
-                  <tr key={card.id} className="border-t border-[#eee4d6]">
+                  <tr
+                    key={card.id}
+                    className="border-t border-[#eee5d8] align-middle transition hover:bg-[#fbf7ef]"
+                  >
                     <td className="p-4">
                       <span
-                        className={`rounded-md px-3 py-1 text-xs font-black ${
-                          card.type === "ATP"
-                            ? "bg-[#f8ead3] text-[#8b5e24]"
+                        className={`inline-flex rounded-md px-3 py-1 text-xs font-black ${
+                          card.type ===
+                          "ATP"
+                            ? "bg-[#f3eadc] text-[#6b421f]"
                             : "bg-green-100 text-green-700"
                         }`}
                       >
@@ -119,10 +199,14 @@ export default async function ProductionPage() {
                       </span>
                     </td>
 
-                    <td className="p-4">
-                      <p className="font-bold text-black">{card.name}</p>
+                    <td className="max-w-[540px] p-4">
+                      <p className="font-black leading-5 text-black">
+                        {card.name}
+                      </p>
+
                       <p className="mt-1 text-xs text-[#7c6a56]">
-                        Waiting for production details
+                        Waiting for
+                        production details
                       </p>
                     </td>
 
@@ -131,17 +215,21 @@ export default async function ProductionPage() {
                     </td>
 
                     <td className="p-4">
-                      <div className="flex justify-end gap-3">
+                      <div className="flex justify-end gap-2">
                         <Link
-                          href={`/orders/printing/queue/${card.id}`}
-                          className="rounded-xl border border-[#dfd4c4] bg-white px-4 py-2 text-sm font-bold text-[#3f352a] hover:bg-[#fbf7ef]"
+                          href={`/orders/printing/queue/${encodeURIComponent(
+                            card.id,
+                          )}`}
+                          className="inline-flex h-10 items-center justify-center rounded-lg border border-[#cfc1ae] bg-white px-4 text-xs font-black text-black transition hover:bg-[#f8f2e8]"
                         >
                           View
                         </Link>
 
                         <Link
-                          href={`/orders/printing/queue/${card.id}/edit`}
-                          className="rounded-xl bg-[#e1bb5f] px-4 py-2 text-sm font-black text-black hover:bg-[#edca73]"
+                          href={`/orders/printing/queue/${encodeURIComponent(
+                            card.id,
+                          )}/edit`}
+                          className="inline-flex h-10 items-center justify-center rounded-lg bg-black px-5 text-xs font-black text-white transition hover:bg-[#6b421f]"
                         >
                           Complete Details
                         </Link>
@@ -149,7 +237,8 @@ export default async function ProductionPage() {
                         <a
                           href={card.url}
                           target="_blank"
-                          className="rounded-xl border border-[#dfd4c4] bg-white px-4 py-2 text-sm font-bold text-[#3f352a] hover:bg-[#fbf7ef]"
+                          rel="noopener noreferrer"
+                          className="inline-flex h-10 items-center justify-center rounded-lg border border-[#cfc1ae] bg-white px-4 text-xs font-black text-black transition hover:bg-[#f8f2e8]"
                         >
                           Trello
                         </a>
@@ -161,11 +250,65 @@ export default async function ProductionPage() {
             </table>
           </div>
         )}
+
+        <div className="border-t border-[#eee5d8] bg-[#fbf7ef] px-5 py-4 text-sm text-[#6f6254] sm:px-7">
+          Showing{" "}
+          <span className="font-black text-black">
+            {cards.length}
+          </span>{" "}
+          intake card
+          {cards.length === 1
+            ? ""
+            : "s"}
+          .
+        </div>
       </section>
 
       <footer className="mt-10 text-center text-xs text-[#7c6a56]">
-        © 2026 LIC Printing Shop. Production Management System.
+        © 2026 LIC Printing
+        Corporation. Production
+        Management System.
       </footer>
     </AppShell>
+  );
+}
+
+function QueueBadge({
+  label,
+  value,
+  emphasized = false,
+}: {
+  label: string;
+  value: number;
+  emphasized?: boolean;
+}) {
+  return (
+    <span
+      className={`inline-flex h-10 items-center rounded-lg px-4 text-sm font-black ${
+        emphasized
+          ? "bg-black text-white"
+          : "border border-[#d8cbb9] bg-white text-[#6b421f]"
+      }`}
+    >
+      {label}: {value}
+    </span>
+  );
+}
+
+function TableHeader({
+  children,
+  right = false,
+}: {
+  children: React.ReactNode;
+  right?: boolean;
+}) {
+  return (
+    <th
+      className={`p-4 text-xs font-black uppercase tracking-wide ${
+        right ? "text-right" : ""
+      }`}
+    >
+      {children}
+    </th>
   );
 }

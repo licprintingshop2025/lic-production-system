@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
 import AppShell from "@/app/components/AppShell";
-import PageHeader from "@/app/components/PageHeader";
 import DocumentItemCard, {
   createEmptyDocument,
 } from "@/app/components/forms/DocumentItemCard";
-
+import PageHeader from "@/app/components/PageHeader";
 import type { DocumentItem } from "@/lib/orders/types";
+import {
+  type ChangeEvent,
+  type FormEvent,
+  type ReactNode,
+  useState,
+} from "react";
 
 type FormData = {
   dateReceived: string;
@@ -24,17 +28,19 @@ const initialFormData: FormData = {
 };
 
 export default function NonBIROrdersPage() {
-  const [formData, setFormData] = useState<FormData>(initialFormData);
+  const [formData, setFormData] =
+    useState<FormData>(initialFormData);
+
   const [saving, setSaving] = useState(false);
   const [savedTrackingNo, setSavedTrackingNo] = useState("");
 
   function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    setFormData((current) => ({
+      ...current,
+      [event.target.name]: event.target.value,
+    }));
   }
 
   function handleDocumentChange(
@@ -44,8 +50,13 @@ export default function NonBIROrdersPage() {
   ) {
     setFormData((current) => ({
       ...current,
-      documents: current.documents.map((doc) =>
-        doc.id === id ? { ...doc, [field]: value } : doc,
+      documents: current.documents.map((document) =>
+        document.id === id
+          ? {
+              ...document,
+              [field]: value,
+            }
+          : document,
       ),
     }));
   }
@@ -53,7 +64,10 @@ export default function NonBIROrdersPage() {
   function handleAddDocument() {
     setFormData((current) => ({
       ...current,
-      documents: [...current.documents, createEmptyDocument()],
+      documents: [
+        ...current.documents,
+        createEmptyDocument(),
+      ],
     }));
   }
 
@@ -63,7 +77,9 @@ export default function NonBIROrdersPage() {
       documents:
         current.documents.length === 1
           ? current.documents
-          : current.documents.filter((doc) => doc.id !== id),
+          : current.documents.filter(
+              (document) => document.id !== id,
+            ),
     }));
   }
 
@@ -72,12 +88,15 @@ export default function NonBIROrdersPage() {
     fallbackField?: keyof DocumentItem,
   ) {
     return formData.documents
-      .map((doc) => {
-        if (fallbackField && doc[field] === "OTHER") {
-          return doc[fallbackField];
+      .map((document) => {
+        if (
+          fallbackField &&
+          document[field] === "OTHER"
+        ) {
+          return document[fallbackField];
         }
 
-        return doc[field];
+        return document[field];
       })
       .filter(Boolean)
       .join(" / ");
@@ -88,8 +107,12 @@ export default function NonBIROrdersPage() {
     setSavedTrackingNo("");
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (saving) {
+      return;
+    }
 
     try {
       setSaving(true);
@@ -103,8 +126,11 @@ export default function NonBIROrdersPage() {
         body: JSON.stringify({
           ...formData,
 
-          // old API-compatible fields
-          description: joinDocuments("description", "descriptionOther"),
+          // Existing API-compatible fields.
+          description: joinDocuments(
+            "description",
+            "descriptionOther",
+          ),
           booklets: joinDocuments("booklets"),
           serialNumbers: joinDocuments("serialNumbers"),
         }),
@@ -113,13 +139,18 @@ export default function NonBIROrdersPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        alert(result.error || "Failed to save Non-BIR order.");
+        alert(
+          result.error || "Failed to save Non-BIR order.",
+        );
         console.error(result);
         return;
       }
 
       setSavedTrackingNo(result.trackingNumber);
-      alert(`Non-BIR Order Saved!\n\nTracking No: ${result.trackingNumber}`);
+
+      alert(
+        `Non-BIR Order Saved!\n\nTracking No: ${result.trackingNumber}`,
+      );
 
       setFormData(initialFormData);
     } finally {
@@ -130,37 +161,46 @@ export default function NonBIROrdersPage() {
   return (
     <AppShell activePage="non-bir-orders" contentWidth="form">
       <PageHeader
+        eyebrow="Orders / Printing"
         title="Non-BIR Orders"
         description="Encode Non-BIR orders using LIC's current production record format and automatically create a Trello card."
       />
 
       {savedTrackingNo && (
-        <section className="mt-7 rounded-xl border border-green-200 bg-green-50 p-6 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-widest text-green-700">
-            Record Saved
+        <section
+          role="status"
+          className="mt-7 rounded-xl border border-green-200 bg-green-50 px-5 py-4 shadow-sm"
+        >
+          <p className="text-sm font-black text-green-800">
+            Non-BIR order saved successfully.
           </p>
-          <h2 className="mt-2 text-2xl font-black text-black">
-            Tracking Number Generated
-          </h2>
-          <p className="mt-3 rounded-lg border border-green-200 bg-white p-4 font-mono text-lg font-bold text-green-700">
-            {savedTrackingNo}
+
+          <p className="mt-2 text-sm text-green-700">
+            Tracking Number:
+            <span className="ml-2 font-mono font-black">
+              {savedTrackingNo}
+            </span>
           </p>
         </section>
       )}
 
-      <form onSubmit={handleSubmit} className="mt-7 space-y-5">
-        <section className="rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-black">
-            Client / Order Information
-          </h2>
-
-          <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+      <form
+        onSubmit={handleSubmit}
+        className="mt-7 space-y-6"
+      >
+        <FormSection
+          number="1"
+          title="Client / Order Information"
+          description="Enter the primary information for the Non-BIR printing order."
+        >
+          <div className="grid gap-5 md:grid-cols-2">
             <Input
               label="Date Received"
               name="dateReceived"
               type="date"
               value={formData.dateReceived}
               onChange={handleChange}
+              disabled={saving}
               required
             />
 
@@ -169,6 +209,7 @@ export default function NonBIROrdersPage() {
               name="businessName"
               value={formData.businessName}
               onChange={handleChange}
+              disabled={saving}
               required
             />
 
@@ -177,19 +218,18 @@ export default function NonBIROrdersPage() {
               name="salesAssigned"
               value={formData.salesAssigned}
               onChange={handleChange}
+              disabled={saving}
               required
             />
           </div>
-        </section>
+        </FormSection>
 
-        <section className="rounded-xl border border-[#e6ddd1] bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-black">Documents Included</h2>
-          <p className="mt-1 text-sm text-[#6f6254]">
-            Add one or more Non-BIR document orders under the same tracking
-            number.
-          </p>
-
-          <div className="mt-6 space-y-5">
+        <FormSection
+          number="2"
+          title="Documents Included"
+          description="Add one or more Non-BIR document orders under the same tracking number."
+        >
+          <div className="space-y-4">
             {formData.documents.map((document, index) => (
               <DocumentItemCard
                 key={document.id}
@@ -202,49 +242,135 @@ export default function NonBIROrdersPage() {
               />
             ))}
 
-            <button
-              type="button"
-              onClick={handleAddDocument}
-              className="rounded-xl border border-[#d6b46a] bg-white px-5 py-3 text-sm font-black text-[#8b5e24] hover:bg-[#fff7e6]"
-            >
-              + Add Another Document
-            </button>
+            <DocumentActions
+              documentCount={formData.documents.length}
+              disabled={saving}
+              onAdd={handleAddDocument}
+            />
           </div>
-        </section>
+        </FormSection>
 
-        <div className="mt-8 border-t border-[#e6ddd1] bg-[#fffaf2] px-6 py-5 lg:px-8">
-          <div className="mx-auto flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-[#6f6254]">
-              Saving this form will add a Non-BIR record to Google Sheets and
-              create a Trello card.
-            </p>
-
-            <div className="flex shrink-0 justify-end gap-3">
-              <button
-                type="button"
-                onClick={handleReset}
-                disabled={saving}
-                className="rounded-lg border border-[#e6ddd1] bg-white px-6 py-3 text-sm font-bold text-black transition hover:bg-[#fbf7ef] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Clear Form
-              </button>
-
-              <button
-                type="submit"
-                disabled={saving}
-                className="rounded-lg bg-[#e1bb5f] px-8 py-3 text-sm font-black text-black transition hover:bg-[#edca73] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving ? "Saving..." : "Save Non-BIR Order"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <FormActions
+          description="Saving this form will add a Non-BIR record to Google Sheets and create a Trello card."
+          saving={saving}
+          onReset={handleReset}
+        />
       </form>
 
-      <footer className="mt-8 text-center text-xs text-[#7c6a56]">
-        © 2026 LIC Printing Shop. Production Management System.
+      <footer className="mt-10 text-center text-xs text-[#7c6a56]">
+        © 2026 LIC Printing Corporation. Production Management
+        System.
       </footer>
     </AppShell>
+  );
+}
+
+function FormSection({
+  number,
+  title,
+  description,
+  children,
+}: {
+  number: string;
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="overflow-visible rounded-2xl border border-[#e3d8c7] bg-white shadow-sm">
+      <div className="rounded-t-2xl border-b border-[#eee5d8] bg-[#fbf7ef] px-5 py-4 sm:px-7">
+        <div className="flex items-start gap-4">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black text-sm font-black text-white">
+            {number}
+          </div>
+
+          <div>
+            <h2 className="text-lg font-black text-black">
+              {title}
+            </h2>
+
+            <p className="mt-1 text-sm leading-6 text-[#6f6254]">
+              {description}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-5 sm:p-7">{children}</div>
+    </section>
+  );
+}
+
+function DocumentActions({
+  documentCount,
+  disabled,
+  onAdd,
+}: {
+  documentCount: number;
+  disabled: boolean;
+  onAdd: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4 rounded-xl border border-[#e3d8c7] bg-[#fbf7ef] p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-sm font-black text-black">
+          Documents Included
+        </p>
+
+        <p className="mt-1 text-sm text-[#6f6254]">
+          {documentCount} document
+          {documentCount === 1 ? "" : "s"} added
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={onAdd}
+        disabled={disabled}
+        className="inline-flex h-11 items-center justify-center rounded-lg border border-black bg-white px-5 text-sm font-black text-black transition hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        + Add Another Document
+      </button>
+    </div>
+  );
+}
+
+function FormActions({
+  description,
+  saving,
+  onReset,
+}: {
+  description: string;
+  saving: boolean;
+  onReset: () => void;
+}) {
+  return (
+    <section className="flex flex-col gap-5 rounded-2xl border border-[#e3d8c7] bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <p className="max-w-2xl text-xs leading-5 text-[#7c6a56]">
+        {description}
+      </p>
+
+      <div className="flex shrink-0 flex-col-reverse gap-3 sm:flex-row">
+        <button
+          type="button"
+          onClick={onReset}
+          disabled={saving}
+          className="inline-flex h-12 items-center justify-center rounded-lg border border-[#cfc1ae] bg-white px-6 text-sm font-black text-black transition hover:bg-[#f8f2e8] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Clear Form
+        </button>
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="inline-flex h-12 min-w-52 items-center justify-center rounded-lg bg-black px-7 text-sm font-black text-white transition hover:bg-[#6b421f] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {saving
+            ? "Saving..."
+            : "Save Non-BIR Order"}
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -255,6 +381,7 @@ function Input({
   type = "text",
   placeholder = "",
   required = false,
+  disabled = false,
   onChange,
 }: {
   label: string;
@@ -263,13 +390,18 @@ function Input({
   type?: string;
   placeholder?: string;
   required?: boolean;
+  disabled?: boolean;
   onChange: React.ChangeEventHandler<HTMLInputElement>;
 }) {
   return (
-    <div>
-      <label className="mb-2 block text-sm font-bold text-black">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
+    <label className="block">
+      <span className="mb-2 block text-sm font-black text-black">
+        {label}
+
+        {required && (
+          <span className="ml-1 text-red-600">*</span>
+        )}
+      </span>
 
       <input
         type={type}
@@ -277,9 +409,13 @@ function Input({
         value={value}
         placeholder={placeholder}
         required={required}
+        disabled={disabled}
         onChange={onChange}
-        className="w-full rounded-lg border border-[#e6ddd1] bg-white p-3 text-black outline-none transition placeholder:text-[#a99b8c] focus:border-[#c89132]"
+        className={inputClassName}
       />
-    </div>
+    </label>
   );
 }
+
+const inputClassName =
+  "h-12 w-full rounded-lg border border-[#d8cbb9] bg-white px-4 text-sm text-black outline-none transition placeholder:text-[#9a8d7d] focus:border-[#8b5e34] focus:ring-2 focus:ring-[#8b5e34]/10 disabled:cursor-not-allowed disabled:bg-[#f4f1ec] disabled:text-[#7c7165]";
