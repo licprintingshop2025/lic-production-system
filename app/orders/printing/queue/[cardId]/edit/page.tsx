@@ -227,6 +227,12 @@ export default function CompleteProductionDetailsPage() {
   const [loadError, setLoadError] =
     useState("");
 
+  const [submissionError, setSubmissionError] =
+    useState("");
+
+  const [showSuccessModal, setShowSuccessModal] =
+    useState(false);
+
   useEffect(() => {
     if (!cardId) {
       setLoadError("Missing Trello card ID.");
@@ -581,6 +587,18 @@ export default function CompleteProductionDetailsPage() {
     return "";
   }
 
+  function handleCloseSuccessModal() {
+    setShowSuccessModal(false);
+
+    router.push(
+      `/orders/printing/queue/${encodeURIComponent(
+        cardId,
+      )}`,
+    );
+
+    router.refresh();
+  }
+
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
   ) {
@@ -590,10 +608,13 @@ export default function CompleteProductionDetailsPage() {
       return;
     }
 
+    setSubmissionError("");
+    setShowSuccessModal(false);
+
     const validationError = validateForm();
 
     if (validationError) {
-      alert(validationError);
+      setSubmissionError(validationError);
       return;
     }
 
@@ -671,7 +692,7 @@ export default function CompleteProductionDetailsPage() {
         };
 
       if (!response.ok) {
-        alert(
+        setSubmissionError(
           result.error ||
             "Failed to save production details.",
         );
@@ -684,20 +705,10 @@ export default function CompleteProductionDetailsPage() {
         return;
       }
 
-      alert(
-        "Production details saved and card moved to Station 4.",
-      );
-
-      router.push(
-        `/orders/printing/queue/${encodeURIComponent(
-          cardId,
-        )}`,
-      );
-
-      router.refresh();
+      setShowSuccessModal(true);
     } catch (error) {
-      alert(
-        "Unexpected error. Check the browser console and terminal.",
+      setSubmissionError(
+        "Unexpected error while saving production details. Please try again.",
       );
 
       console.error(
@@ -850,6 +861,36 @@ export default function CompleteProductionDetailsPage() {
         onSubmit={handleSubmit}
         className="mt-7 space-y-6"
       >
+        {submissionError && (
+          <section
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-black text-red-800">
+                  Unable to save production details
+                </p>
+
+                <p className="mt-1 text-sm leading-6 text-red-700">
+                  {submissionError}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSubmissionError("")
+                }
+                className="shrink-0 rounded-md px-2 py-1 text-sm font-black text-red-700 transition hover:bg-red-100"
+                aria-label="Dismiss error"
+              >
+                ×
+              </button>
+            </div>
+          </section>
+        )}
+
         <FormSection
           number="1"
           title="Order Handling"
@@ -1095,7 +1136,112 @@ export default function CompleteProductionDetailsPage() {
         © 2026 LIC Printing Corporation. Production
         Management System.
       </footer>
+
+      {showSuccessModal && (
+        <SuccessModal
+          cardName={cardName}
+          onClose={handleCloseSuccessModal}
+        />
+      )}
     </AppShell>
+  );
+}
+
+function SuccessModal({
+  cardName,
+  onClose,
+}: {
+  cardName: string;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="production-success-title"
+    >
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-[#d9c9b1] bg-white shadow-2xl">
+        <div className="bg-black px-6 py-5 sm:px-7">
+          <div className="flex items-center gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#b58a52] text-xl font-black text-black">
+              ✓
+            </div>
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c6a66f]">
+                Production Updated
+              </p>
+
+              <h2
+                id="production-success-title"
+                className="mt-1 text-xl font-black text-white"
+              >
+                Production Details Successfully Saved
+              </h2>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 sm:p-7">
+          <p className="text-sm leading-6 text-[#6f6254]">
+            The production details have been saved successfully
+            and the Trello card has been moved to Station 4.
+          </p>
+
+          {cardName && (
+            <div className="mt-6 rounded-xl border border-[#dfd1bd] bg-[#fbf7ef] p-5">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[#7c6a56]">
+                Production Order
+              </p>
+
+              <p className="mt-2 text-base font-black leading-6 text-black">
+                {cardName}
+              </p>
+            </div>
+          )}
+
+          <div className="mt-6 rounded-xl border border-[#dfd1bd] bg-[#fbf7ef] p-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-[#7c6a56]">
+                  Current Station
+                </p>
+
+                <p className="mt-2 text-lg font-black text-black">
+                  Station 4
+                </p>
+
+                <p className="mt-1 text-sm text-[#6f6254]">
+                  Non-BIR and ATP Receiving
+                </p>
+              </div>
+
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-black text-sm font-black text-white">
+                4
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-lg border border-[#eadfce] bg-[#fffdf9] px-4 py-3">
+            <p className="text-xs leading-5 text-[#766958]">
+              The order is now ready to continue through the
+              production workflow.
+            </p>
+          </div>
+
+          <div className="mt-7 flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-12 min-w-36 items-center justify-center rounded-lg bg-black px-6 text-sm font-black text-white transition hover:bg-[#6b421f]"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

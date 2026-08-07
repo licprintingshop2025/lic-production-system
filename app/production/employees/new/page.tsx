@@ -36,16 +36,18 @@ const STATION_SKILLS = [
   "Ready for Release",
 ];
 
-const initialEmployee: Employee = {
-  employeeId: "",
-  name: "",
-  position: "",
-  skills: [],
-  status: "Active",
-  maxStations: 1,
-  shift: "Whole Day",
-  employmentType: "Full-time",
-};
+function createInitialEmployee(): Employee {
+  return {
+    employeeId: "",
+    name: "",
+    position: "",
+    skills: [],
+    status: "Active",
+    maxStations: 1,
+    shift: "Whole Day",
+    employmentType: "Full-time",
+  };
+}
 
 export default function NewEmployeePage() {
   const router = useRouter();
@@ -54,7 +56,19 @@ export default function NewEmployeePage() {
     useState(false);
 
   const [employee, setEmployee] =
-    useState<Employee>(initialEmployee);
+    useState<Employee>(createInitialEmployee());
+
+  const [submissionError, setSubmissionError] =
+    useState("");
+
+  const [createdEmployee, setCreatedEmployee] =
+    useState<{
+      employeeId: string;
+      name: string;
+    } | null>(null);
+
+  const [copied, setCopied] =
+    useState(false);
 
   function updateField(
     field: keyof Employee,
@@ -86,7 +100,40 @@ export default function NewEmployeePage() {
   }
 
   function handleReset() {
-    setEmployee(initialEmployee);
+    setEmployee(createInitialEmployee());
+    setSubmissionError("");
+    setCopied(false);
+  }
+
+  async function handleCopyEmployeeId() {
+    if (!createdEmployee?.employeeId) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(
+        createdEmployee.employeeId,
+      );
+
+      setCopied(true);
+
+      window.setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.error(
+        "Failed to copy employee ID:",
+        error,
+      );
+    }
+  }
+
+  function handleCloseSuccessModal() {
+    setCreatedEmployee(null);
+    setCopied(false);
+
+    router.push("/production/employees");
+    router.refresh();
   }
 
   async function handleCreate() {
@@ -94,18 +141,47 @@ export default function NewEmployeePage() {
       return;
     }
 
-    if (
-      !employee.employeeId.trim() ||
-      !employee.name.trim()
-    ) {
-      alert(
-        "Employee ID and Name are required.",
+    setSubmissionError("");
+    setCopied(false);
+
+    if (!employee.employeeId.trim()) {
+      setSubmissionError(
+        "Employee ID is required.",
       );
+
+      return;
+    }
+
+    if (!employee.name.trim()) {
+      setSubmissionError(
+        "Employee name is required.",
+      );
+
+      return;
+    }
+
+    if (
+      !Number.isFinite(employee.maxStations) ||
+      employee.maxStations < 1
+    ) {
+      setSubmissionError(
+        "Maximum Stations must be at least 1.",
+      );
+
       return;
     }
 
     try {
       setSaving(true);
+
+      const normalizedEmployee: Employee = {
+        ...employee,
+        employeeId:
+          employee.employeeId.trim(),
+        name: employee.name.trim(),
+        position:
+          employee.position.trim(),
+      };
 
       const response = await fetch(
         "/api/employees",
@@ -115,7 +191,9 @@ export default function NewEmployeePage() {
             "Content-Type":
               "application/json",
           },
-          body: JSON.stringify(employee),
+          body: JSON.stringify(
+            normalizedEmployee,
+          ),
         },
       );
 
@@ -123,19 +201,35 @@ export default function NewEmployeePage() {
         await response.json();
 
       if (!response.ok) {
-        alert(
+        setSubmissionError(
           result.error ||
             "Failed to create employee.",
         );
+
+        console.error(
+          "Create employee response:",
+          result,
+        );
+
         return;
       }
 
-      alert(
-        "Employee created successfully.",
+      setCreatedEmployee({
+        employeeId:
+          normalizedEmployee.employeeId,
+        name: normalizedEmployee.name,
+      });
+
+      setEmployee(createInitialEmployee());
+    } catch (error) {
+      console.error(
+        "Create employee error:",
+        error,
       );
 
-      router.push("/production/employees");
-      router.refresh();
+      setSubmissionError(
+        "Unexpected error while creating the employee. Please try again.",
+      );
     } finally {
       setSaving(false);
     }
@@ -160,13 +254,44 @@ export default function NewEmployeePage() {
               "/production/employees",
             )
           }
-          className="text-sm font-bold text-[#6b421f] hover:underline"
+          disabled={saving}
+          className="text-sm font-bold text-[#6b421f] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
         >
           ← Back to Employee Management
         </button>
       </div>
 
       <div className="mt-7 space-y-6">
+        {submissionError && (
+          <section
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-black text-red-800">
+                  Unable to create employee
+                </p>
+
+                <p className="mt-1 text-sm leading-6 text-red-700">
+                  {submissionError}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSubmissionError("")
+                }
+                className="shrink-0 rounded-md px-2 py-1 text-sm font-black text-red-700 transition hover:bg-red-100"
+                aria-label="Dismiss error"
+              >
+                ×
+              </button>
+            </div>
+          </section>
+        )}
+
         <FormSection
           number="1"
           title="Employee Information"
@@ -435,7 +560,122 @@ export default function NewEmployeePage() {
           </div>
         </section>
       </div>
+
+      {createdEmployee && (
+        <SuccessModal
+          employeeId={
+            createdEmployee.employeeId
+          }
+          employeeName={
+            createdEmployee.name
+          }
+          copied={copied}
+          onCopy={handleCopyEmployeeId}
+          onClose={handleCloseSuccessModal}
+        />
+      )}
     </AppShell>
+  );
+}
+
+function SuccessModal({
+  employeeId,
+  employeeName,
+  copied,
+  onCopy,
+  onClose,
+}: {
+  employeeId: string;
+  employeeName: string;
+  copied: boolean;
+  onCopy: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="employee-success-title"
+    >
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-[#d9c9b1] bg-white shadow-2xl">
+        <div className="bg-black px-6 py-5 sm:px-7">
+          <div className="flex items-center gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#b58a52] text-xl font-black text-black">
+              ✓
+            </div>
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c6a66f]">
+                Employee Created
+              </p>
+
+              <h2
+                id="employee-success-title"
+                className="mt-1 text-xl font-black text-white"
+              >
+                Employee Record Successfully Created
+              </h2>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 sm:p-7">
+          <p className="text-sm leading-6 text-[#6f6254]">
+            The employee record has been added successfully to
+            the Employee Database and is now available in Employee
+            Management.
+          </p>
+
+          <div className="mt-6 rounded-xl border border-[#dfd1bd] bg-[#fbf7ef] p-5">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-[#7c6a56]">
+              Employee
+            </p>
+
+            <p className="mt-2 text-lg font-black text-black">
+              {employeeName}
+            </p>
+
+            <div className="mt-4 border-t border-[#e7dbc9] pt-4">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[#7c6a56]">
+                Employee ID
+              </p>
+
+              <p className="mt-2 break-all font-mono text-xl font-black tracking-wide text-black">
+                {employeeId}
+              </p>
+
+              <button
+                type="button"
+                onClick={onCopy}
+                className="mt-4 inline-flex h-10 items-center justify-center rounded-lg border border-[#bda98c] bg-white px-4 text-xs font-black text-black transition hover:border-black hover:bg-black hover:text-white"
+              >
+                {copied
+                  ? "Employee ID Copied"
+                  : "Copy Employee ID"}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-lg border border-[#eadfce] bg-[#fffdf9] px-4 py-3">
+            <p className="text-xs leading-5 text-[#766958]">
+              Click Done to return to Employee Management and
+              review the new employee record.
+            </p>
+          </div>
+
+          <div className="mt-7 flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-12 min-w-36 items-center justify-center rounded-lg bg-black px-6 text-sm font-black text-white transition hover:bg-[#6b421f]"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

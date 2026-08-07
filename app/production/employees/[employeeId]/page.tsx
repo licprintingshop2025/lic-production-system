@@ -58,10 +58,23 @@ export default function EmployeeDetailsPage() {
   const [saving, setSaving] =
     useState(false);
 
+  const [loadError, setLoadError] =
+    useState("");
+
+  const [submissionError, setSubmissionError] =
+    useState("");
+
+  const [showSuccessModal, setShowSuccessModal] =
+    useState(false);
+
+  const [copied, setCopied] =
+    useState(false);
+
   const loadEmployee =
     useCallback(async () => {
       try {
         setLoading(true);
+        setLoadError("");
 
         const response = await fetch(
           "/api/employees",
@@ -71,8 +84,9 @@ export default function EmployeeDetailsPage() {
         );
 
         if (!response.ok) {
-          setEmployee(null);
-          return;
+          throw new Error(
+            "Failed to load employee records.",
+          );
         }
 
         const data =
@@ -115,6 +129,12 @@ export default function EmployeeDetailsPage() {
         console.error(
           "Employee fetch failed:",
           error,
+        );
+
+        setLoadError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load employee details.",
         );
 
         setEmployee(null);
@@ -166,20 +186,73 @@ export default function EmployeeDetailsPage() {
     });
   }
 
+  async function handleCopyEmployeeId() {
+    if (!employee?.employeeId) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(
+        employee.employeeId,
+      );
+
+      setCopied(true);
+
+      window.setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.error(
+        "Failed to copy employee ID:",
+        error,
+      );
+    }
+  }
+
+  function handleCloseSuccessModal() {
+    setShowSuccessModal(false);
+    setCopied(false);
+
+    router.push("/production/employees");
+    router.refresh();
+  }
+
   async function handleSave() {
     if (!employee || saving) {
       return;
     }
 
+    setSubmissionError("");
+    setCopied(false);
+
     if (!employee.name.trim()) {
-      alert(
+      setSubmissionError(
         "Employee name is required.",
       );
+
+      return;
+    }
+
+    if (
+      !Number.isFinite(employee.maxStations) ||
+      employee.maxStations < 1
+    ) {
+      setSubmissionError(
+        "Maximum Stations must be at least 1.",
+      );
+
       return;
     }
 
     try {
       setSaving(true);
+
+      const normalizedEmployee: Employee = {
+        ...employee,
+        name: employee.name.trim(),
+        position:
+          employee.position.trim(),
+      };
 
       const response = await fetch(
         `/api/employees/${encodeURIComponent(
@@ -191,7 +264,9 @@ export default function EmployeeDetailsPage() {
             "Content-Type":
               "application/json",
           },
-          body: JSON.stringify(employee),
+          body: JSON.stringify(
+            normalizedEmployee,
+          ),
         },
       );
 
@@ -199,19 +274,30 @@ export default function EmployeeDetailsPage() {
         await response.json();
 
       if (!response.ok) {
-        alert(
+        setSubmissionError(
           result.error ||
             "Failed to update employee.",
         );
+
+        console.error(
+          "Update employee response:",
+          result,
+        );
+
         return;
       }
 
-      alert(
-        "Employee updated successfully.",
+      setEmployee(normalizedEmployee);
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error(
+        "Update employee error:",
+        error,
       );
 
-      router.push("/production/employees");
-      router.refresh();
+      setSubmissionError(
+        "Unexpected error while updating the employee. Please try again.",
+      );
     } finally {
       setSaving(false);
     }
@@ -230,7 +316,9 @@ export default function EmployeeDetailsPage() {
         />
 
         <section className="mt-7 rounded-2xl border border-[#e3d8c7] bg-white p-10 text-center shadow-sm">
-          <p className="text-sm font-black text-black">
+          <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#eadfcf] border-t-black" />
+
+          <p className="mt-4 text-sm font-black text-black">
             Loading employee details...
           </p>
         </section>
@@ -251,9 +339,15 @@ export default function EmployeeDetailsPage() {
         />
 
         <section className="mt-7 rounded-2xl border border-red-200 bg-red-50 p-6 shadow-sm">
-          <p className="text-sm font-black text-red-700">
-            No employee record was found
-            for ID: {employeeId || "-"}.
+          <p className="font-black text-red-800">
+            Unable to load employee
+          </p>
+
+          <p className="mt-2 text-sm text-red-700">
+            {loadError ||
+              `No employee record was found for ID: ${
+                employeeId || "-"
+              }.`}
           </p>
 
           <button
@@ -291,13 +385,44 @@ export default function EmployeeDetailsPage() {
               "/production/employees",
             )
           }
-          className="text-sm font-bold text-[#6b421f] hover:underline"
+          disabled={saving}
+          className="text-sm font-bold text-[#6b421f] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
         >
           ← Back to Employee Management
         </button>
       </div>
 
       <div className="mt-7 space-y-6">
+        {submissionError && (
+          <section
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-black text-red-800">
+                  Unable to update employee
+                </p>
+
+                <p className="mt-1 text-sm leading-6 text-red-700">
+                  {submissionError}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSubmissionError("")
+                }
+                className="shrink-0 rounded-md px-2 py-1 text-sm font-black text-red-700 transition hover:bg-red-100"
+                aria-label="Dismiss error"
+              >
+                ×
+              </button>
+            </div>
+          </section>
+        )}
+
         <FormSection
           number="1"
           title="Employee Information"
@@ -546,7 +671,118 @@ export default function EmployeeDetailsPage() {
           </div>
         </section>
       </div>
+
+      {showSuccessModal && (
+        <SuccessModal
+          employeeId={employee.employeeId}
+          employeeName={employee.name}
+          copied={copied}
+          onCopy={handleCopyEmployeeId}
+          onClose={handleCloseSuccessModal}
+        />
+      )}
     </AppShell>
+  );
+}
+
+function SuccessModal({
+  employeeId,
+  employeeName,
+  copied,
+  onCopy,
+  onClose,
+}: {
+  employeeId: string;
+  employeeName: string;
+  copied: boolean;
+  onCopy: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="employee-update-success-title"
+    >
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-[#d9c9b1] bg-white shadow-2xl">
+        <div className="bg-black px-6 py-5 sm:px-7">
+          <div className="flex items-center gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#b58a52] text-xl font-black text-black">
+              ✓
+            </div>
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c6a66f]">
+                Changes Saved
+              </p>
+
+              <h2
+                id="employee-update-success-title"
+                className="mt-1 text-xl font-black text-white"
+              >
+                Employee Record Successfully Updated
+              </h2>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 sm:p-7">
+          <p className="text-sm leading-6 text-[#6f6254]">
+            The employee record has been updated successfully
+            and the latest information is now saved in the
+            Employee Database.
+          </p>
+
+          <div className="mt-6 rounded-xl border border-[#dfd1bd] bg-[#fbf7ef] p-5">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-[#7c6a56]">
+              Employee
+            </p>
+
+            <p className="mt-2 text-lg font-black text-black">
+              {employeeName}
+            </p>
+
+            <div className="mt-4 border-t border-[#e7dbc9] pt-4">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[#7c6a56]">
+                Employee ID
+              </p>
+
+              <p className="mt-2 break-all font-mono text-xl font-black tracking-wide text-black">
+                {employeeId}
+              </p>
+
+              <button
+                type="button"
+                onClick={onCopy}
+                className="mt-4 inline-flex h-10 items-center justify-center rounded-lg border border-[#bda98c] bg-white px-4 text-xs font-black text-black transition hover:border-black hover:bg-black hover:text-white"
+              >
+                {copied
+                  ? "Employee ID Copied"
+                  : "Copy Employee ID"}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-lg border border-[#eadfce] bg-[#fffdf9] px-4 py-3">
+            <p className="text-xs leading-5 text-[#766958]">
+              Click Done to return to Employee Management and
+              review the updated employee record.
+            </p>
+          </div>
+
+          <div className="mt-7 flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-12 min-w-36 items-center justify-center rounded-lg bg-black px-6 text-sm font-black text-white transition hover:bg-[#6b421f]"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

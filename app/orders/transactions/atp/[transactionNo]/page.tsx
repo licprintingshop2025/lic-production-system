@@ -255,6 +255,7 @@ function resolveTaxType(document: DocumentItem): string {
 
 export default function EditAtpApplicationPage() {
   const router = useRouter();
+
   const params = useParams<{
     transactionNo: string;
   }>();
@@ -273,6 +274,7 @@ export default function EditAtpApplicationPage() {
   const [selectedForms, setSelectedForms] = useState<
     string[]
   >([]);
+
   const [formUsedOther, setFormUsedOther] = useState("");
 
   const [taxpayerName, setTaxpayerName] = useState("");
@@ -281,10 +283,12 @@ export default function EditAtpApplicationPage() {
 
   const [selectedForm1905, setSelectedForm1905] =
     useState<string[]>([]);
+
   const [form1905Other, setForm1905Other] = useState("");
 
   const [selectedPenalties, setSelectedPenalties] =
     useState<string[]>([]);
+
   const [penaltyOther, setPenaltyOther] = useState("");
 
   const [documents, setDocuments] = useState<DocumentItem[]>([
@@ -295,6 +299,7 @@ export default function EditAtpApplicationPage() {
   const [email, setEmail] = useState("");
 
   const [assistedBy, setAssistedBy] = useState("");
+
   const [assistedByOther, setAssistedByOther] =
     useState("");
 
@@ -302,13 +307,19 @@ export default function EditAtpApplicationPage() {
   const [status, setStatus] = useState("Pending");
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [isSubmitting, setIsSubmitting] =
+    useState(false);
 
   const [loadError, setLoadError] = useState("");
+
   const [submissionError, setSubmissionError] =
     useState("");
-  const [successMessage, setSuccessMessage] =
-    useState("");
+
+  const [showSuccessModal, setShowSuccessModal] =
+    useState(false);
+
+  const [copied, setCopied] = useState(false);
 
   const populateForm = useCallback(
     (record: TransactionRecord) => {
@@ -486,6 +497,35 @@ export default function EditAtpApplicationPage() {
     });
   }
 
+  async function handleCopyTransactionNumber() {
+    if (!transactionNo) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(transactionNo);
+
+      setCopied(true);
+
+      window.setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.error(
+        "Failed to copy transaction number:",
+        error,
+      );
+    }
+  }
+
+  function handleCloseSuccessModal() {
+    setShowSuccessModal(false);
+    setCopied(false);
+
+    router.push("/orders/transactions/atp");
+    router.refresh();
+  }
+
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
   ) {
@@ -496,7 +536,8 @@ export default function EditAtpApplicationPage() {
     }
 
     setSubmissionError("");
-    setSuccessMessage("");
+    setShowSuccessModal(false);
+    setCopied(false);
 
     const normalizedForms = normalizeSelectedValues(
       selectedForms,
@@ -507,6 +548,7 @@ export default function EditAtpApplicationPage() {
       setSubmissionError(
         "Select at least one option under Form Used.",
       );
+
       return;
     }
 
@@ -514,7 +556,10 @@ export default function EditAtpApplicationPage() {
       selectedForms.includes("OTHER") &&
       !formUsedOther.trim()
     ) {
-      setSubmissionError("Specify the other form used.");
+      setSubmissionError(
+        "Specify the other form used.",
+      );
+
       return;
     }
 
@@ -525,6 +570,7 @@ export default function EditAtpApplicationPage() {
       setSubmissionError(
         "Specify the other 1905 transaction.",
       );
+
       return;
     }
 
@@ -535,6 +581,7 @@ export default function EditAtpApplicationPage() {
       setSubmissionError(
         "Specify the other penalty or transaction.",
       );
+
       return;
     }
 
@@ -559,13 +606,17 @@ export default function EditAtpApplicationPage() {
             index + 1
           }.`,
         );
+
         return;
       }
 
       if (!document.taxType) {
         setSubmissionError(
-          `Select the tax type for Document ${index + 1}.`,
+          `Select the tax type for Document ${
+            index + 1
+          }.`,
         );
+
         return;
       }
 
@@ -579,6 +630,7 @@ export default function EditAtpApplicationPage() {
             index + 1
           } must be a whole number of at least 1.`,
         );
+
         return;
       }
     }
@@ -592,6 +644,7 @@ export default function EditAtpApplicationPage() {
       setSubmissionError(
         "Select or specify the staff member assisting the transaction.",
       );
+
       return;
     }
 
@@ -654,25 +707,21 @@ export default function EditAtpApplicationPage() {
         );
       }
 
-      if (result.transaction) {
-        populateForm(result.transaction);
+      const updatedRecord =
+        result.transaction || result.data;
+
+      if (updatedRecord) {
+        populateForm(updatedRecord);
       }
 
-      setSuccessMessage(
-        `Transaction ${transactionNo} was updated successfully.`,
-      );
-
-      window.setTimeout(() => {
-        router.push("/orders/transactions/atp");
-        router.refresh();
-      }, 1200);
+      setShowSuccessModal(true);
     } catch (error) {
       setSubmissionError(
         error instanceof Error
           ? error.message
           : "An unexpected error occurred while updating the transaction.",
       );
-
+    } finally {
       setIsSubmitting(false);
     }
   }
@@ -692,7 +741,10 @@ export default function EditAtpApplicationPage() {
 
   if (isLoading) {
     return (
-      <AppShell activePage="orders" contentWidth="form">
+      <AppShell
+        activePage="orders"
+        contentWidth="form"
+      >
         <PageHeader
           eyebrow="Transactions / ATP Processing"
           title="Edit ATP Application"
@@ -710,7 +762,10 @@ export default function EditAtpApplicationPage() {
 
   if (loadError || !transaction) {
     return (
-      <AppShell activePage="orders" contentWidth="form">
+      <AppShell
+        activePage="orders"
+        contentWidth="form"
+      >
         <PageHeader
           eyebrow="Transactions / ATP Processing"
           title="Edit ATP Application"
@@ -738,7 +793,10 @@ export default function EditAtpApplicationPage() {
   }
 
   return (
-    <AppShell activePage="orders" contentWidth="form">
+    <AppShell
+      activePage="orders"
+      contentWidth="form"
+    >
       <PageHeader
         eyebrow="Transactions / ATP Processing"
         title="Edit ATP Application"
@@ -765,22 +823,37 @@ export default function EditAtpApplicationPage() {
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-7 space-y-6">
+      <form
+        onSubmit={handleSubmit}
+        className="mt-7 space-y-6"
+      >
         {submissionError && (
           <div
             role="alert"
-            className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-bold text-red-700"
+            className="rounded-xl border border-red-200 bg-red-50 px-5 py-4"
           >
-            {submissionError}
-          </div>
-        )}
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-black text-red-800">
+                  Unable to update ATP application
+                </p>
 
-        {successMessage && (
-          <div
-            role="status"
-            className="rounded-xl border border-green-200 bg-green-50 px-5 py-4 text-sm font-bold text-green-800"
-          >
-            {successMessage}
+                <p className="mt-1 text-sm leading-6 text-red-700">
+                  {submissionError}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSubmissionError("")
+                }
+                className="shrink-0 rounded-md px-2 py-1 text-sm font-black text-red-700 transition hover:bg-red-100"
+                aria-label="Dismiss error"
+              >
+                ×
+              </button>
+            </div>
           </div>
         )}
 
@@ -806,22 +879,35 @@ export default function EditAtpApplicationPage() {
               />
             </FormField>
 
-            <FormField label="Manual or ORUS" required>
+            <FormField
+              label="Manual or ORUS"
+              required
+            >
               <select
                 value={applicationMethod}
                 required
                 disabled={isSubmitting}
                 onChange={(event) =>
-                  setApplicationMethod(event.target.value)
+                  setApplicationMethod(
+                    event.target.value,
+                  )
                 }
                 className={inputClassName}
               >
-                <option value="" disabled>
+                <option
+                  value=""
+                  disabled
+                >
                   Select processing method
                 </option>
 
-                <option value="MANUAL">MANUAL</option>
-                <option value="ORUS">ORUS</option>
+                <option value="MANUAL">
+                  MANUAL
+                </option>
+
+                <option value="ORUS">
+                  ORUS
+                </option>
               </select>
             </FormField>
 
@@ -849,7 +935,9 @@ export default function EditAtpApplicationPage() {
                   required
                   disabled={isSubmitting}
                   onChange={(event) =>
-                    setFormUsedOther(event.target.value)
+                    setFormUsedOther(
+                      event.target.value,
+                    )
                   }
                   placeholder="Specify other form used"
                   className={`${inputClassName} mt-3`}
@@ -857,7 +945,10 @@ export default function EditAtpApplicationPage() {
               )}
             </div>
 
-            <FormField label="Status" required>
+            <FormField
+              label="Status"
+              required
+            >
               <select
                 value={status}
                 required
@@ -868,21 +959,29 @@ export default function EditAtpApplicationPage() {
                 className={inputClassName}
               >
                 {STATUS_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
+                  <option
+                    key={option}
+                    value={option}
+                  >
                     {option}
                   </option>
                 ))}
               </select>
             </FormField>
 
-            <FormField label="Taxpayer Name" required>
+            <FormField
+              label="Taxpayer Name"
+              required
+            >
               <input
                 type="text"
                 value={taxpayerName}
                 required
                 disabled={isSubmitting}
                 onChange={(event) =>
-                  setTaxpayerName(event.target.value)
+                  setTaxpayerName(
+                    event.target.value,
+                  )
                 }
                 className={inputClassName}
               />
@@ -898,7 +997,9 @@ export default function EditAtpApplicationPage() {
                 required
                 disabled={isSubmitting}
                 onChange={(event) =>
-                  setBusinessName(event.target.value)
+                  setBusinessName(
+                    event.target.value,
+                  )
                 }
                 className={inputClassName}
               />
@@ -949,14 +1050,18 @@ export default function EditAtpApplicationPage() {
                 }
               />
 
-              {selectedForm1905.includes("OTHER") && (
+              {selectedForm1905.includes(
+                "OTHER",
+              ) && (
                 <input
                   type="text"
                   value={form1905Other}
                   required
                   disabled={isSubmitting}
                   onChange={(event) =>
-                    setForm1905Other(event.target.value)
+                    setForm1905Other(
+                      event.target.value,
+                    )
                   }
                   placeholder="Specify other 1905 transaction"
                   className={`${inputClassName} mt-3`}
@@ -980,14 +1085,18 @@ export default function EditAtpApplicationPage() {
                 }
               />
 
-              {selectedPenalties.includes("OTHER") && (
+              {selectedPenalties.includes(
+                "OTHER",
+              ) && (
                 <input
                   type="text"
                   value={penaltyOther}
                   required
                   disabled={isSubmitting}
                   onChange={(event) =>
-                    setPenaltyOther(event.target.value)
+                    setPenaltyOther(
+                      event.target.value,
+                    )
                   }
                   placeholder="Specify other penalty or transaction"
                   className={`${inputClassName} mt-3`}
@@ -1003,17 +1112,21 @@ export default function EditAtpApplicationPage() {
           description="Update each document type, tax type, and corresponding quantity."
         >
           <div className="space-y-4">
-            {documents.map((document, index) => (
-              <DocumentItemFields
-                key={document.id}
-                document={document}
-                index={index}
-                canRemove={documents.length > 1}
-                disabled={isSubmitting}
-                onChange={updateDocument}
-                onRemove={removeDocument}
-              />
-            ))}
+            {documents.map(
+              (document, index) => (
+                <DocumentItemFields
+                  key={document.id}
+                  document={document}
+                  index={index}
+                  canRemove={
+                    documents.length > 1
+                  }
+                  disabled={isSubmitting}
+                  onChange={updateDocument}
+                  onRemove={removeDocument}
+                />
+              ),
+            )}
 
             <div className="flex flex-col gap-4 rounded-xl border border-[#e3d8c7] bg-[#fbf7ef] p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -1022,9 +1135,11 @@ export default function EditAtpApplicationPage() {
                 </p>
 
                 <p className="mt-1 text-sm text-[#6f6254]">
-                  {totalDocumentQuantity} total across{" "}
-                  {documents.length} document
-                  {documents.length === 1 ? "" : "s"}
+                  {totalDocumentQuantity} total
+                  across {documents.length} document
+                  {documents.length === 1
+                    ? ""
+                    : "s"}
                 </p>
               </div>
 
@@ -1032,7 +1147,7 @@ export default function EditAtpApplicationPage() {
                 type="button"
                 disabled={isSubmitting}
                 onClick={addDocument}
-                className="inline-flex h-11 items-center justify-center rounded-lg border border-black bg-white px-5 text-sm font-black text-black transition hover:bg-black hover:text-white disabled:opacity-50"
+                className="inline-flex h-11 items-center justify-center rounded-lg border border-black bg-white px-5 text-sm font-black text-black transition hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 + Add Another Document
               </button>
@@ -1052,7 +1167,9 @@ export default function EditAtpApplicationPage() {
                 value={mobileNumber}
                 disabled={isSubmitting}
                 onChange={(event) =>
-                  setMobileNumber(event.target.value)
+                  setMobileNumber(
+                    event.target.value,
+                  )
                 }
                 placeholder="Optional"
                 className={inputClassName}
@@ -1072,25 +1189,38 @@ export default function EditAtpApplicationPage() {
               />
             </FormField>
 
-            <FormField label="Assisted By" required>
+            <FormField
+              label="Assisted By"
+              required
+            >
               <select
                 value={assistedBy}
                 required
                 disabled={isSubmitting}
                 onChange={(event) =>
-                  setAssistedBy(event.target.value)
+                  setAssistedBy(
+                    event.target.value,
+                  )
                 }
                 className={inputClassName}
               >
-                <option value="" disabled>
+                <option
+                  value=""
+                  disabled
+                >
                   Select staff member
                 </option>
 
-                {ASSISTED_BY_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
+                {ASSISTED_BY_OPTIONS.map(
+                  (option) => (
+                    <option
+                      key={option}
+                      value={option}
+                    >
+                      {option}
+                    </option>
+                  ),
+                )}
               </select>
 
               {assistedBy === "OTHER" && (
@@ -1100,7 +1230,9 @@ export default function EditAtpApplicationPage() {
                   required
                   disabled={isSubmitting}
                   onChange={(event) =>
-                    setAssistedByOther(event.target.value)
+                    setAssistedByOther(
+                      event.target.value,
+                    )
                   }
                   placeholder="Specify staff member"
                   className={`${inputClassName} mt-3`}
@@ -1108,7 +1240,10 @@ export default function EditAtpApplicationPage() {
               )}
             </FormField>
 
-            <FormField label="Books" required>
+            <FormField
+              label="Books"
+              required
+            >
               <select
                 value={books}
                 required
@@ -1118,21 +1253,34 @@ export default function EditAtpApplicationPage() {
                 }
                 className={inputClassName}
               >
-                <option value="" disabled>
+                <option
+                  value=""
+                  disabled
+                >
                   Select option
                 </option>
 
-                <option value="YES">YES</option>
-                <option value="NO">NO</option>
+                <option value="YES">
+                  YES
+                </option>
+
+                <option value="NO">
+                  NO
+                </option>
               </select>
             </FormField>
           </div>
         </FormSection>
 
-        <section className="flex flex-col-reverse gap-3 rounded-2xl border border-[#e3d8c7] bg-white p-5 shadow-sm sm:flex-row sm:justify-end">
+        <section className="flex flex-col-reverse gap-3 rounded-2xl border border-[#e3d8c7] bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-end">
           <Link
             href="/orders/transactions/atp"
-            className="inline-flex h-12 items-center justify-center rounded-lg border border-[#cfc1ae] bg-white px-6 text-sm font-black text-black transition hover:bg-[#f8f2e8]"
+            aria-disabled={isSubmitting}
+            className={`inline-flex h-12 items-center justify-center rounded-lg border border-[#cfc1ae] bg-white px-6 text-sm font-black text-black transition ${
+              isSubmitting
+                ? "pointer-events-none cursor-not-allowed opacity-50"
+                : "hover:bg-[#f8f2e8]"
+            }`}
           >
             Cancel
           </Link>
@@ -1140,7 +1288,7 @@ export default function EditAtpApplicationPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex h-12 min-w-44 items-center justify-center rounded-lg bg-black px-7 text-sm font-black text-white transition hover:bg-[#6b421f] disabled:opacity-60"
+            className="inline-flex h-12 min-w-44 items-center justify-center rounded-lg bg-black px-7 text-sm font-black text-white transition hover:bg-[#6b421f] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting
               ? "Saving Changes..."
@@ -1148,7 +1296,105 @@ export default function EditAtpApplicationPage() {
           </button>
         </section>
       </form>
+
+      {showSuccessModal && (
+        <SuccessModal
+          transactionNumber={transactionNo}
+          copied={copied}
+          onCopy={handleCopyTransactionNumber}
+          onClose={handleCloseSuccessModal}
+        />
+      )}
     </AppShell>
+  );
+}
+
+function SuccessModal({
+  transactionNumber,
+  copied,
+  onCopy,
+  onClose,
+}: {
+  transactionNumber: string;
+  copied: boolean;
+  onCopy: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="success-modal-title"
+    >
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-[#d9c9b1] bg-white shadow-2xl">
+        <div className="bg-black px-6 py-5 sm:px-7">
+          <div className="flex items-center gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#b58a52] text-xl font-black text-black">
+              ✓
+            </div>
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c6a66f]">
+                Changes Saved
+              </p>
+
+              <h2
+                id="success-modal-title"
+                className="mt-1 text-xl font-black text-white"
+              >
+                ATP Application Successfully Updated
+              </h2>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 sm:p-7">
+          <p className="text-sm leading-6 text-[#6f6254]">
+            The ATP application changes have been saved
+            successfully and synchronized with the transaction
+            record.
+          </p>
+
+          <div className="mt-6 rounded-xl border border-[#dfd1bd] bg-[#fbf7ef] p-5">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-[#7c6a56]">
+              Transaction Number
+            </p>
+
+            <p className="mt-2 break-all font-mono text-xl font-black tracking-wide text-black sm:text-2xl">
+              {transactionNumber}
+            </p>
+
+            <button
+              type="button"
+              onClick={onCopy}
+              className="mt-4 inline-flex h-10 items-center justify-center rounded-lg border border-[#bda98c] bg-white px-4 text-xs font-black text-black transition hover:border-black hover:bg-black hover:text-white"
+            >
+              {copied
+                ? "Transaction Number Copied"
+                : "Copy Transaction Number"}
+            </button>
+          </div>
+
+          <div className="mt-6 rounded-lg border border-[#eadfce] bg-[#fffdf9] px-4 py-3">
+            <p className="text-xs leading-5 text-[#766958]">
+              Click Done to return to ATP Processing and continue
+              monitoring this application.
+            </p>
+          </div>
+
+          <div className="mt-7 flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-12 min-w-36 items-center justify-center rounded-lg bg-black px-6 text-sm font-black text-white transition hover:bg-[#6b421f]"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1169,14 +1415,20 @@ function MultiSelectDropdown({
   placeholder: string;
   onToggle: (value: string) => void;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef =
+    useRef<HTMLDivElement>(null);
+
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    function handleOutsideClick(event: MouseEvent) {
+    function handleOutsideClick(
+      event: MouseEvent,
+    ) {
       if (
         containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
+        !containerRef.current.contains(
+          event.target as Node,
+        )
       ) {
         setIsOpen(false);
       }
@@ -1195,71 +1447,110 @@ function MultiSelectDropdown({
     };
   }, []);
 
+  useEffect(() => {
+    if (disabled) {
+      setIsOpen(false);
+    }
+  }, [disabled]);
+
   return (
-    <div ref={containerRef} className="relative">
-      <span className="mb-2 block text-sm font-black">
+    <div
+      ref={containerRef}
+      className="relative"
+    >
+      <span className="mb-2 block text-sm font-black text-black">
         {label}
 
         {required && (
-          <span className="ml-1 text-red-600">*</span>
+          <span className="ml-1 text-red-600">
+            *
+          </span>
         )}
       </span>
 
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setIsOpen((current) => !current)}
-        className="flex min-h-12 w-full items-center justify-between rounded-lg border border-[#d8cbb9] bg-white px-4 py-2 text-left text-sm"
+        aria-expanded={isOpen}
+        onClick={() =>
+          setIsOpen(
+            (current) => !current,
+          )
+        }
+        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border border-[#d8cbb9] bg-white px-4 py-2 text-left text-sm text-black outline-none transition hover:border-[#8b5e34] focus:border-[#8b5e34] focus:ring-2 focus:ring-[#8b5e34]/10 disabled:cursor-not-allowed disabled:bg-[#f4f1ec] disabled:text-[#7c7165]"
       >
-        <span className="flex flex-wrap gap-1.5">
-          {selectedValues.length === 0
-            ? placeholder
-            : selectedValues.map((value) => (
-                <span
-                  key={value}
-                  className="rounded-md bg-[#f3eadc] px-2 py-1 text-xs font-black text-[#6b421f]"
-                >
-                  {value}
-                </span>
-              ))}
+        <span className="min-w-0 flex-1">
+          {selectedValues.length === 0 ? (
+            <span className="text-[#9a8d7d]">
+              {placeholder}
+            </span>
+          ) : (
+            <span className="flex flex-wrap gap-1.5">
+              {selectedValues.map(
+                (value) => (
+                  <span
+                    key={value}
+                    className="max-w-full truncate rounded-md bg-[#f3eadc] px-2 py-1 text-xs font-black text-[#6b421f]"
+                  >
+                    {value}
+                  </span>
+                ),
+              )}
+            </span>
+          )}
         </span>
 
-        <span>▼</span>
+        <span
+          aria-hidden="true"
+          className={`shrink-0 text-xs transition-transform ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        >
+          ▼
+        </span>
       </button>
 
       {isOpen && (
-        <div className="absolute z-40 mt-2 w-full rounded-xl border border-[#d8cbb9] bg-white shadow-xl">
+        <div className="absolute left-0 right-0 z-40 mt-2 overflow-hidden rounded-xl border border-[#d8cbb9] bg-white shadow-xl">
           <div className="max-h-64 overflow-y-auto p-2">
-            {options.map((option) => {
-              const selected = selectedValues.includes(option);
+            <div className="space-y-1">
+              {options.map((option) => {
+                const selected =
+                  selectedValues.includes(option);
 
-              return (
-                <label
-                  key={option}
-                  className={`flex cursor-pointer gap-3 rounded-lg px-3 py-2.5 text-sm font-bold ${
-                    selected
-                      ? "bg-black text-white"
-                      : "hover:bg-[#f8f2e8]"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    onChange={() => onToggle(option)}
-                    className="accent-black"
-                  />
+                return (
+                  <label
+                    key={option}
+                    className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold transition ${
+                      selected
+                        ? "bg-black text-white"
+                        : "text-black hover:bg-[#f8f2e8]"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      disabled={disabled}
+                      onChange={() =>
+                        onToggle(option)
+                      }
+                      className="h-4 w-4 shrink-0 accent-black"
+                    />
 
-                  {option}
-                </label>
-              );
-            })}
+                    <span>{option}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="border-t p-2">
+          <div className="border-t border-[#eee5d8] bg-[#fbf7ef] p-2">
             <button
               type="button"
-              onClick={() => setIsOpen(false)}
-              className="h-10 w-full rounded-lg bg-black text-xs font-black text-white"
+              onClick={() =>
+                setIsOpen(false)
+              }
+              className="h-10 w-full rounded-lg bg-black text-xs font-black text-white transition hover:bg-[#6b421f]"
             >
               Done
             </button>
@@ -1290,18 +1581,26 @@ function DocumentItemFields({
   onRemove: (id: string) => void;
 }) {
   return (
-    <section className="rounded-xl border border-[#ddd0bd] bg-[#fffdf9] p-5">
-      <div className="mb-4 flex justify-between">
-        <h3 className="font-black">
-          Document {index + 1}
-        </h3>
+    <section className="rounded-xl border border-[#ddd0bd] bg-[#fffdf9] p-4 sm:p-5">
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-[#8b5e34]">
+            Invoice or Receipt
+          </p>
+
+          <h3 className="mt-1 text-base font-black text-black">
+            Document {index + 1}
+          </h3>
+        </div>
 
         {canRemove && (
           <button
             type="button"
             disabled={disabled}
-            onClick={() => onRemove(document.id)}
-            className="text-xs font-black text-red-700"
+            onClick={() =>
+              onRemove(document.id)
+            }
+            className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 bg-white px-4 text-xs font-black text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Remove
           </button>
@@ -1325,12 +1624,18 @@ function DocumentItemFields({
             }
             className={inputClassName}
           >
-            <option value="" disabled>
+            <option
+              value=""
+              disabled
+            >
               Select document
             </option>
 
             {DOCUMENT_OPTIONS.map((option) => (
-              <option key={option} value={option}>
+              <option
+                key={option}
+                value={option}
+              >
                 {option}
               </option>
             ))}
@@ -1338,7 +1643,9 @@ function DocumentItemFields({
 
           {document.documentType === "OTHER" && (
             <input
+              type="text"
               value={document.documentTypeOther}
+              disabled={disabled}
               onChange={(event) =>
                 onChange(
                   document.id,
@@ -1352,7 +1659,10 @@ function DocumentItemFields({
           )}
         </FormField>
 
-        <FormField label="Tax Type" required>
+        <FormField
+          label="Tax Type"
+          required
+        >
           <select
             value={document.taxType}
             disabled={disabled}
@@ -1365,12 +1675,18 @@ function DocumentItemFields({
             }
             className={inputClassName}
           >
-            <option value="" disabled>
+            <option
+              value=""
+              disabled
+            >
               Select tax type
             </option>
 
             {TAX_TYPE_OPTIONS.map((option) => (
-              <option key={option} value={option}>
+              <option
+                key={option}
+                value={option}
+              >
                 {option}
               </option>
             ))}
@@ -1378,7 +1694,9 @@ function DocumentItemFields({
 
           {document.taxType === "OTHER" && (
             <input
+              type="text"
               value={document.taxTypeOther}
+              disabled={disabled}
               onChange={(event) =>
                 onChange(
                   document.id,
@@ -1430,22 +1748,27 @@ function FormSection({
 }) {
   return (
     <section className="overflow-visible rounded-2xl border border-[#e3d8c7] bg-white shadow-sm">
-      <div className="border-b bg-[#fbf7ef] px-7 py-4">
-        <div className="flex gap-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-black text-sm font-black text-white">
+      <div className="rounded-t-2xl border-b border-[#eee5d8] bg-[#fbf7ef] px-5 py-4 sm:px-7">
+        <div className="flex items-start gap-4">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black text-sm font-black text-white">
             {number}
           </div>
 
           <div>
-            <h2 className="text-lg font-black">{title}</h2>
-            <p className="mt-1 text-sm text-[#6f6254]">
+            <h2 className="text-lg font-black text-black">
+              {title}
+            </h2>
+
+            <p className="mt-1 text-sm leading-6 text-[#6f6254]">
               {description}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="p-7">{children}</div>
+      <div className="p-5 sm:p-7">
+        {children}
+      </div>
     </section>
   );
 }
@@ -1461,10 +1784,13 @@ function FormField({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-black">
+      <span className="mb-2 block text-sm font-black text-black">
         {label}
+
         {required && (
-          <span className="ml-1 text-red-600">*</span>
+          <span className="ml-1 text-red-600">
+            *
+          </span>
         )}
       </span>
 
@@ -1474,4 +1800,4 @@ function FormField({
 }
 
 const inputClassName =
-  "h-12 w-full rounded-lg border border-[#d8cbb9] bg-white px-4 text-sm text-black outline-none focus:border-[#8b5e34] focus:ring-2 focus:ring-[#8b5e34]/10 disabled:bg-[#f4f1ec]";
+  "h-12 w-full rounded-lg border border-[#d8cbb9] bg-white px-4 text-sm text-black outline-none transition placeholder:text-[#9a8d7d] focus:border-[#8b5e34] focus:ring-2 focus:ring-[#8b5e34]/10 disabled:cursor-not-allowed disabled:bg-[#f4f1ec] disabled:text-[#7c7165]";

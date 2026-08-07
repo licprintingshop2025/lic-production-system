@@ -28,27 +28,31 @@ type FormData = {
   salesAssignedOther: string;
 };
 
-const initialFormData: FormData = {
-  dateOfAtp: "",
-  ocn: "",
-  tin: "",
-  taxpayerName: "",
-  businessName: "",
-  registeredAddress: "",
-  rdoCode: "",
-  taxType: "",
-  documents: [createEmptyDocument()],
-  atpReceived: "",
-  salesAssigned: "",
-  salesAssignedOther: "",
-};
+function createInitialFormData(): FormData {
+  return {
+    dateOfAtp: "",
+    ocn: "",
+    tin: "",
+    taxpayerName: "",
+    businessName: "",
+    registeredAddress: "",
+    rdoCode: "",
+    taxType: "",
+    documents: [createEmptyDocument()],
+    atpReceived: "",
+    salesAssigned: "",
+    salesAssignedOther: "",
+  };
+}
 
 export default function ReceivedATPPage() {
   const [formData, setFormData] =
-    useState<FormData>(initialFormData);
+    useState<FormData>(createInitialFormData());
 
   const [saving, setSaving] = useState(false);
   const [savedTrackingNo, setSavedTrackingNo] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [copied, setCopied] = useState(false);
 
   function handleChange(
     event: ChangeEvent<
@@ -102,8 +106,32 @@ export default function ReceivedATPPage() {
   }
 
   function handleReset() {
-    setFormData(initialFormData);
+    setFormData(createInitialFormData());
     setSavedTrackingNo("");
+    setErrorMessage("");
+    setCopied(false);
+  }
+
+  async function handleCopyTrackingNumber() {
+    if (!savedTrackingNo) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(savedTrackingNo);
+      setCopied(true);
+
+      window.setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to copy tracking number:", error);
+    }
+  }
+
+  function handleCloseSuccessModal() {
+    setSavedTrackingNo("");
+    setCopied(false);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -116,6 +144,8 @@ export default function ReceivedATPPage() {
     try {
       setSaving(true);
       setSavedTrackingNo("");
+      setErrorMessage("");
+      setCopied(false);
 
       const response = await fetch("/api/received-atp", {
         method: "POST",
@@ -128,18 +158,23 @@ export default function ReceivedATPPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        alert(result.error || "Failed to save ATP record.");
+        setErrorMessage(
+          result.error || "Failed to save ATP record.",
+        );
+
         console.error(result);
         return;
       }
 
       setSavedTrackingNo(result.trackingNo);
 
-      alert(
-        `ATP Record Saved!\n\nTracking No: ${result.trackingNo}`,
-      );
+      setFormData(createInitialFormData());
+    } catch (error) {
+      console.error(error);
 
-      setFormData(initialFormData);
+      setErrorMessage(
+        "Something went wrong while saving the ATP record. Please try again.",
+      );
     } finally {
       setSaving(false);
     }
@@ -153,21 +188,31 @@ export default function ReceivedATPPage() {
         description="Encode received ATP records and automatically create a Trello job card using LIC's production workflow format."
       />
 
-      {savedTrackingNo && (
+      {errorMessage && (
         <section
-          role="status"
-          className="mt-7 rounded-xl border border-green-200 bg-green-50 px-5 py-4 shadow-sm"
+          role="alert"
+          className="mt-7 rounded-xl border border-red-200 bg-red-50 px-5 py-4 shadow-sm"
         >
-          <p className="text-sm font-black text-green-800">
-            ATP record saved successfully.
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-black text-red-800">
+                Unable to save ATP record
+              </p>
 
-          <p className="mt-2 text-sm text-green-700">
-            Tracking Number:
-            <span className="ml-2 font-mono font-black">
-              {savedTrackingNo}
-            </span>
-          </p>
+              <p className="mt-1 text-sm leading-6 text-red-700">
+                {errorMessage}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setErrorMessage("")}
+              className="shrink-0 rounded-md px-2 py-1 text-sm font-black text-red-700 transition hover:bg-red-100"
+              aria-label="Dismiss error"
+            >
+              ×
+            </button>
+          </div>
         </section>
       )}
 
@@ -353,7 +398,104 @@ export default function ReceivedATPPage() {
         © 2026 LIC Printing Corporation. Production Management
         System.
       </footer>
+
+      {savedTrackingNo && (
+        <SuccessModal
+          trackingNumber={savedTrackingNo}
+          copied={copied}
+          onCopy={handleCopyTrackingNumber}
+          onClose={handleCloseSuccessModal}
+        />
+      )}
     </AppShell>
+  );
+}
+
+function SuccessModal({
+  trackingNumber,
+  copied,
+  onCopy,
+  onClose,
+}: {
+  trackingNumber: string;
+  copied: boolean;
+  onCopy: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="success-modal-title"
+    >
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-[#d9c9b1] bg-white shadow-2xl">
+        <div className="bg-black px-6 py-5 sm:px-7">
+          <div className="flex items-center gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#b58a52] text-xl font-black text-black">
+              ✓
+            </div>
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c6a66f]">
+                ATP Saved
+              </p>
+
+              <h2
+                id="success-modal-title"
+                className="mt-1 text-xl font-black text-white"
+              >
+                ATP Record Successfully Saved
+              </h2>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 sm:p-7">
+          <p className="text-sm leading-6 text-[#6f6254]">
+            The ATP record has been saved and the corresponding
+            production job has been added to the LIC workflow.
+          </p>
+
+          <div className="mt-6 rounded-xl border border-[#dfd1bd] bg-[#fbf7ef] p-5">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-[#7c6a56]">
+              Tracking Number
+            </p>
+
+            <p className="mt-2 break-all font-mono text-xl font-black tracking-wide text-black sm:text-2xl">
+              {trackingNumber}
+            </p>
+
+            <button
+              type="button"
+              onClick={onCopy}
+              className="mt-4 inline-flex h-10 items-center justify-center rounded-lg border border-[#bda98c] bg-white px-4 text-xs font-black text-black transition hover:border-black hover:bg-black hover:text-white"
+            >
+              {copied
+                ? "Tracking Number Copied"
+                : "Copy Tracking Number"}
+            </button>
+          </div>
+
+          <div className="mt-6 rounded-lg border border-[#eadfce] bg-[#fffdf9] px-4 py-3">
+            <p className="text-xs leading-5 text-[#766958]">
+              Keep the tracking number for production monitoring,
+              customer reference, and future order lookup.
+            </p>
+          </div>
+
+          <div className="mt-7 flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-12 min-w-36 items-center justify-center rounded-lg bg-black px-6 text-sm font-black text-white transition hover:bg-[#6b421f]"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
