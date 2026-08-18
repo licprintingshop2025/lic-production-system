@@ -237,6 +237,11 @@ export function normalizeTransactionInput(
 
     branch: cleanText(body.branch),
 
+    rdoCode: requireText(
+      body.rdoCode ?? body.rdo,
+      "RDO Code",
+    ).toUpperCase(),
+
     documents,
 
     mobileNumber: cleanText(

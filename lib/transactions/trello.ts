@@ -8,6 +8,10 @@ import {
   getUniqueTaxTypes,
   serializeStringArray,
 } from "@/lib/transactions/utils";
+import {
+  formatDateForTitle,
+  getReceiptCode,
+} from "@/lib/orders/utils";
 
 type TrelloCard = {
   id: string;
@@ -108,18 +112,48 @@ export function buildTransactionCardName(
   transactionNo: string,
   transaction: TransactionInput,
 ): string {
-  const clientName =
-    cleanText(transaction.businessName) ||
-    cleanText(transaction.taxpayerName) ||
-    "Unnamed Client";
+  void transactionNo;
 
-  const forms = serializeStringArray(
-    transaction.formUsed,
+  const staffName = cleanText(transaction.assistedBy)
+    .replace(/^[^-]+\s*-\s*/, "")
+    .trim();
+
+  const tradeName =
+    cleanText(transaction.businessName) ||
+    cleanText(transaction.taxpayerName);
+
+  const branch = cleanText(transaction.branch);
+  const rdoCode = cleanText(transaction.rdoCode).toUpperCase();
+
+  const branchText = branch
+    ? ` (BRANCH ${branch})`
+    : "";
+
+  const rdoText = rdoCode
+    ? ` (${rdoCode})`
+    : "";
+
+  const orderType = transaction.documents
+    .map(
+      (document) =>
+        `${getReceiptCode(document.documentType)}-${document.quantity}`,
+    )
+    .join(" ");
+
+  const taxType = getUniqueTaxTypes(transaction.documents)
+    .join(" / ");
+
+  const receivedDate = formatDateForTitle(
+    transaction.dateReceived,
   );
 
-  return forms
-    ? `${transactionNo} | ${clientName} | ${forms}`
-    : `${transactionNo} | ${clientName}`;
+  return `(${staffName || "NO STAFF"}) ${
+    tradeName || "NO TRADE NAME"
+  }${branchText}${rdoText}
+${orderType || "ORDER TYPE"}
+${
+    taxType || "TAX TYPE"
+  } ${receivedDate} (PC ATP)`;
 }
 
 export function buildTransactionCardDescription(
@@ -161,6 +195,7 @@ export function buildTransactionCardDescription(
       transaction.businessName,
     )}`,
     `Branch: ${displayText(transaction.branch)}`,
+    `RDO Code: ${displayText(transaction.rdoCode)}`,
     "",
     "FORM 1905",
     displayList(transaction.form1905),

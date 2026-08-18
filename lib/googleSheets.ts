@@ -503,10 +503,10 @@ export async function getDailyAssignmentsRows() {
 
 // ============================================================
 // TRANSACTIONS
-// Google Sheet columns: A:U
+// Google Sheet columns: A:V
 // ============================================================
 
-const TRANSACTIONS_LAST_COLUMN = "U";
+const TRANSACTIONS_LAST_COLUMN = "V";
 
 function getTransactionsSheetTab(): string {
   return (
@@ -647,57 +647,60 @@ export function buildTransactionSheetRow(
     // F — Branch
     transaction.branch,
 
-    // G — 1905
+    // G — RDO Code
+    transaction.rdoCode,
+
+    // H — 1905
     serializeStringArray(
       transaction.form1905,
     ),
 
-    // H — Compute Penalty (0605)
+    // I — Compute Penalty (0605)
     serializeStringArray(
       transaction.computePenalty,
     ),
 
-    // I — Description / Kind of Invoice or Receipt
+    // J — Description / Kind of Invoice or Receipt
     serializeStringArray(documentTypes),
 
-    // J — Tax Type
+    // K — Tax Type
     serializeStringArray(taxTypes),
 
-    // K — No. of Booklets or Pads
+    // L — No. of Booklets or Pads
     serializeTransactionQuantities(
       quantities,
     ),
 
-    // L — Mobile / Viber Number
+    // M — Mobile / Viber Number
     transaction.mobileNumber,
 
-    // M — Email
+    // N — Email
     transaction.email,
 
-    // N — Assisted By
+    // O — Assisted By
     transaction.assistedBy,
 
-    // O — Books
+    // P — Books
     serializeStringArray(
       transaction.books,
     ),
 
-    // P — Transaction No.
+    // Q — Transaction No.
     transaction.transactionNo,
 
-    // Q — Status
+    // R — Status
     transaction.status,
 
-    // R — Created At
+    // S — Created At
     transaction.createdAt,
 
-    // S — Updated At
+    // T — Updated At
     transaction.updatedAt,
 
-    // T — Trello Card ID
+    // U — Trello Card ID
     transaction.trelloCardId,
 
-    // U — Trello Card URL
+    // V — Trello Card URL
     transaction.trelloCardUrl,
   ];
 }
@@ -727,50 +730,53 @@ export function parseTransactionSheetRow(
     branch:
       cleanSheetValue(row[5]),
 
+    rdoCode:
+      cleanSheetValue(row[6]).toUpperCase(),
+
     form1905:
-      normalizeStringArray(row[6]),
+      normalizeStringArray(row[7]),
 
     computePenalty:
-      normalizeStringArray(row[7]),
+      normalizeStringArray(row[8]),
 
     documents:
       parseTransactionDocumentsFromColumns(
-        row[8],
         row[9],
         row[10],
+        row[11],
       ),
 
     mobileNumber:
-      cleanSheetValue(row[11]),
-
-    email:
       cleanSheetValue(row[12]),
 
-    assistedBy:
+    email:
       cleanSheetValue(row[13]),
 
+    assistedBy:
+      cleanSheetValue(row[14]),
+
     books:
-      normalizeStringArray(row[14]),
+      normalizeStringArray(row[15]),
 
     transactionNo:
-      cleanSheetValue(row[15]),
+      cleanSheetValue(row[16]),
 
     status:
       normalizeTransactionStatus(
-        row[16],
+        row[17],
       ),
 
     createdAt:
-      cleanSheetValue(row[17]),
-
-    updatedAt:
       cleanSheetValue(row[18]),
 
-    trelloCardId:
+    updatedAt:
       cleanSheetValue(row[19]),
 
-    trelloCardUrl:
+    trelloCardId:
       cleanSheetValue(row[20]),
+
+    trelloCardUrl:
+      cleanSheetValue(row[21]),
   };
 }
 

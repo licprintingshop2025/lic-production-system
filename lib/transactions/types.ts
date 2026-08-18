@@ -22,6 +22,7 @@ export type TransactionInput = {
   taxpayerName: string;
   businessName: string;
   branch: string;
+  rdoCode: string;
 
   documents: TransactionDocument[];
 

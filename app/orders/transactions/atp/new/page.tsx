@@ -495,6 +495,11 @@ export default function NewAtpApplicationPage() {
 
       branch: getFormValue(formData, "branch"),
 
+      rdoCode: getFormValue(
+        formData,
+        "rdoCode",
+      ).toUpperCase(),
+
       documents: normalizedDocuments,
 
       mobileNumber: getFormValue(
@@ -736,6 +741,20 @@ export default function NewAtpApplicationPage() {
                 name="branch"
                 disabled={isSubmitting}
                 placeholder="Enter branch"
+                className={inputClassName}
+              />
+            </FormField>
+
+            <FormField
+              label="RDO Code"
+              required
+            >
+              <input
+                type="text"
+                name="rdoCode"
+                required
+                disabled={isSubmitting}
+                placeholder="Example: 046"
                 className={inputClassName}
               />
             </FormField>

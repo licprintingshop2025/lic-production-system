@@ -126,6 +126,7 @@ type TransactionRecord = {
   taxpayerName: string;
   businessName: string;
   branch: string;
+  rdoCode: string;
   form1905: string[];
   computePenalty: string[];
   documents: TransactionDocument[];
@@ -280,6 +281,7 @@ export default function EditAtpApplicationPage() {
   const [taxpayerName, setTaxpayerName] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [branch, setBranch] = useState("");
+  const [rdoCode, setRdoCode] = useState("");
 
   const [selectedForm1905, setSelectedForm1905] =
     useState<string[]>([]);
@@ -339,6 +341,7 @@ export default function EditAtpApplicationPage() {
       setTaxpayerName(record.taxpayerName || "");
       setBusinessName(record.businessName || "");
       setBranch(record.branch || "");
+      setRdoCode(record.rdoCode || "");
 
       const form1905Values = splitKnownAndOtherValues(
         record.form1905 || [],
@@ -667,6 +670,7 @@ export default function EditAtpApplicationPage() {
       taxpayerName: taxpayerName.trim(),
       businessName: businessName.trim(),
       branch: branch.trim(),
+      rdoCode: rdoCode.trim().toUpperCase(),
 
       documents: normalizedDocuments,
 
@@ -1013,6 +1017,25 @@ export default function EditAtpApplicationPage() {
                 onChange={(event) =>
                   setBranch(event.target.value)
                 }
+                className={inputClassName}
+              />
+            </FormField>
+
+            <FormField
+              label="RDO Code"
+              required
+            >
+              <input
+                type="text"
+                value={rdoCode}
+                required
+                disabled={isSubmitting}
+                onChange={(event) =>
+                  setRdoCode(
+                    event.target.value.toUpperCase(),
+                  )
+                }
+                placeholder="Example: 046"
                 className={inputClassName}
               />
             </FormField>

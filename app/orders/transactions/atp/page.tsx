@@ -31,6 +31,7 @@ type TransactionRecord = {
   taxpayerName: string;
   businessName: string;
   branch: string;
+  rdoCode: string;
   form1905: string[];
   computePenalty: string[];
   documents: TransactionDocument[];
