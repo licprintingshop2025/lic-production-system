@@ -363,7 +363,7 @@ export async function appendNonBIROrderRow(
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
-    range: "'Non-BIR Orders'!A:H",
+    range: "'Non-BIR Orders'!A:I",
     valueInputOption: "RAW",
     requestBody: {
       values: [row],
@@ -378,7 +378,7 @@ export async function getNonBIROrderRows() {
   const response =
     await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: "'Non-BIR Orders'!A:H",
+      range: "'Non-BIR Orders'!A:I",
     });
 
   return response.data.values || [];
@@ -644,8 +644,8 @@ export function buildTransactionSheetRow(
     // E — Business / Tradename
     transaction.businessName,
 
-    // F — Branch
-    transaction.branch,
+    // F — TIN
+    transaction.tin,
 
     // G — RDO Code
     transaction.rdoCode,
@@ -727,7 +727,7 @@ export function parseTransactionSheetRow(
     businessName:
       cleanSheetValue(row[4]),
 
-    branch:
+    tin:
       cleanSheetValue(row[5]),
 
     rdoCode:
@@ -1083,9 +1083,9 @@ export function mergeTransactionRecord(
       updates.businessName ??
       existing.businessName,
 
-    branch:
-      updates.branch ??
-      existing.branch,
+    tin:
+      updates.tin ??
+      existing.tin,
 
     documents:
       updates.documents ??
@@ -1126,4 +1126,44 @@ export function mergeTransactionRecord(
     trelloCardUrl:
       existing.trelloCardUrl,
   };
+}
+export async function updateReceivedATPRow(
+  rowNumber: number,
+  row: (string | number)[],
+) {
+  if (!Number.isInteger(rowNumber) || rowNumber < 2) {
+    throw new Error("Invalid Received ATP row number.");
+  }
+
+  const { sheets, sheetId } = getSheetsClient();
+  const sheetTab = process.env.GOOGLE_SHEET_TAB || "Received ATP";
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: sheetId,
+    range: `'${sheetTab}'!A${rowNumber}:S${rowNumber}`,
+    valueInputOption: "RAW",
+    requestBody: { values: [row] },
+  });
+
+  return { success: true, rowNumber };
+}
+
+export async function updateNonBIROrderRow(
+  rowNumber: number,
+  row: (string | number)[],
+) {
+  if (!Number.isInteger(rowNumber) || rowNumber < 2) {
+    throw new Error("Invalid Non-BIR Orders row number.");
+  }
+
+  const { sheets, sheetId } = getSheetsClient();
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: sheetId,
+    range: `'Non-BIR Orders'!A${rowNumber}:H${rowNumber}`,
+    valueInputOption: "RAW",
+    requestBody: { values: [row] },
+  });
+
+  return { success: true, rowNumber };
 }

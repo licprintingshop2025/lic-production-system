@@ -12,6 +12,7 @@ export type DocumentItem = {
 
 export type ReceivedATPOrder = {
   trackingNo: string;
+  submittedAt?: string;
   dateOfAtp: string;
   ocn: string;
   tin: string;

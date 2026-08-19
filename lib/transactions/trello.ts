@@ -10,7 +10,6 @@ import {
 } from "@/lib/transactions/utils";
 import {
   formatDateForTitle,
-  getReceiptCode,
 } from "@/lib/orders/utils";
 
 type TrelloCard = {
@@ -114,7 +113,9 @@ export function buildTransactionCardName(
 ): string {
   void transactionNo;
 
-  const staffName = cleanText(transaction.assistedBy)
+  const staffName = cleanText(
+    transaction.assistedBy,
+  )
     .replace(/^[^-]+\s*-\s*/, "")
     .trim();
 
@@ -122,53 +123,86 @@ export function buildTransactionCardName(
     cleanText(transaction.businessName) ||
     cleanText(transaction.taxpayerName);
 
-  const branch = cleanText(transaction.branch);
-  const rdoCode = cleanText(transaction.rdoCode).toUpperCase();
-
-  const branchText = branch
-    ? ` (BRANCH ${branch})`
-    : "";
+  const rdoCode = cleanText(
+    transaction.rdoCode,
+  ).toUpperCase();
 
   const rdoText = rdoCode
     ? ` (${rdoCode})`
     : "";
 
   const orderType = transaction.documents
-    .map(
-      (document) =>
-        `${getReceiptCode(document.documentType)}-${document.quantity}`,
-    )
-    .join(" ");
+    .map((document) => {
+      const documentType = cleanText(
+        document.documentType,
+      ).toUpperCase();
 
-  const taxType = getUniqueTaxTypes(transaction.documents)
+      return `${
+        documentType || "DOCUMENT"
+      }-${document.quantity}`;
+    })
+    .filter(Boolean)
     .join(" / ");
 
-  const receivedDate = formatDateForTitle(
-    transaction.dateReceived,
-  );
+  const taxType = getUniqueTaxTypes(
+    transaction.documents,
+  )
+    .map((value) =>
+      cleanText(value).toUpperCase(),
+    )
+    .filter(Boolean)
+    .join(" / ");
+
+  const receivedDate =
+    formatDateForTitle(
+      transaction.dateReceived,
+    );
+
+  const formUsed = transaction.formUsed
+    .map((form) =>
+      cleanText(form).toUpperCase(),
+    )
+    .filter(Boolean)
+    .join(" / ");
+
+  const applicationMethod =
+    cleanText(
+      transaction.applicationMethod,
+    ).toUpperCase();
+
+  const titleSuffix = [
+    formUsed,
+    applicationMethod,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return `(${staffName || "NO STAFF"}) ${
     tradeName || "NO TRADE NAME"
-  }${branchText}${rdoText}
+  }${rdoText}
 ${orderType || "ORDER TYPE"}
 ${
     taxType || "TAX TYPE"
-  } ${receivedDate} (PC ATP)`;
+  } ${receivedDate} (${titleSuffix || "FORM"})`;
 }
 
 export function buildTransactionCardDescription(
   transaction: TransactionRecord,
 ): string {
   const documentDescriptions =
-    getDocumentDescriptions(transaction.documents);
+    getDocumentDescriptions(
+      transaction.documents,
+    );
 
-  const taxTypes = getUniqueTaxTypes(
-    transaction.documents,
-  );
+  const taxTypes =
+    getUniqueTaxTypes(
+      transaction.documents,
+    );
 
-  const totalQuantity = getTotalDocumentQuantity(
-    transaction.documents,
-  );
+  const totalQuantity =
+    getTotalDocumentQuantity(
+      transaction.documents,
+    );
 
   return [
     "TRANSACTION INFORMATION",
@@ -176,7 +210,9 @@ export function buildTransactionCardDescription(
     `Transaction No.: ${displayText(
       transaction.transactionNo,
     )}`,
-    `Status: ${displayText(transaction.status)}`,
+    `Status: ${displayText(
+      transaction.status,
+    )}`,
     `Date Received of Application: ${displayText(
       transaction.dateReceived,
     )}`,
@@ -185,7 +221,9 @@ export function buildTransactionCardDescription(
     )}`,
     "",
     "FORM USED",
-    displayList(transaction.formUsed),
+    displayList(
+      transaction.formUsed,
+    ),
     "",
     "TAXPAYER INFORMATION",
     `Taxpayer Name: ${displayText(
@@ -194,20 +232,32 @@ export function buildTransactionCardDescription(
     `Business / Tradename: ${displayText(
       transaction.businessName,
     )}`,
-    `Branch: ${displayText(transaction.branch)}`,
-    `RDO Code: ${displayText(transaction.rdoCode)}`,
+    `TIN: ${displayText(
+      transaction.tin,
+    )}`,
+    `RDO Code: ${displayText(
+      transaction.rdoCode,
+    )}`,
     "",
     "FORM 1905",
-    displayList(transaction.form1905),
+    displayList(
+      transaction.form1905,
+    ),
     "",
     "COMPUTE PENALTY (0605)",
-    displayList(transaction.computePenalty),
+    displayList(
+      transaction.computePenalty,
+    ),
     "",
     "INVOICE OR RECEIPT DETAILS",
-    displayList(documentDescriptions),
+    displayList(
+      documentDescriptions,
+    ),
     "",
     "TAX TYPE",
-    displayList(taxTypes),
+    displayList(
+      taxTypes,
+    ),
     "",
     `Total No. of Booklets or Pads: ${totalQuantity}`,
     "",
@@ -215,14 +265,18 @@ export function buildTransactionCardDescription(
     `Mobile / Viber Number: ${displayText(
       transaction.mobileNumber,
     )}`,
-    `Email: ${displayText(transaction.email)}`,
+    `Email: ${displayText(
+      transaction.email,
+    )}`,
     "",
     "ASSIGNMENT",
     `Assisted By: ${displayText(
       transaction.assistedBy,
     )}`,
     `Books: ${displayText(
-      serializeStringArray(transaction.books),
+      serializeStringArray(
+        transaction.books,
+      ),
     )}`,
     "",
     "SYSTEM INFORMATION",
@@ -238,10 +292,15 @@ export function buildTransactionCardDescription(
 export async function createTransactionTrelloCard(
   transaction: Omit<
     TransactionRecord,
-    "trelloCardId" | "trelloCardUrl"
+    "trelloCardId" |
+      "trelloCardUrl"
   >,
 ): Promise<TrelloCard> {
-  const { key, token, listId } =
+  const {
+    key,
+    token,
+    listId,
+  } =
     getTransactionsTrelloConfig();
 
   const temporaryRecord: TransactionRecord = {
@@ -251,21 +310,28 @@ export async function createTransactionTrelloCard(
   };
 
   const response = await fetch(
-    buildTrelloUrl("/cards", key, token),
+    buildTrelloUrl(
+      "/cards",
+      key,
+      token,
+    ),
     {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type":
+          "application/json",
       },
       body: JSON.stringify({
         idList: listId,
-        name: buildTransactionCardName(
-          transaction.transactionNo,
-          transaction,
-        ),
-        desc: buildTransactionCardDescription(
-          temporaryRecord,
-        ),
+        name:
+          buildTransactionCardName(
+            transaction.transactionNo,
+            transaction,
+          ),
+        desc:
+          buildTransactionCardDescription(
+            temporaryRecord,
+          ),
         pos: "top",
       }),
       cache: "no-store",
@@ -273,22 +339,27 @@ export async function createTransactionTrelloCard(
   );
 
   if (!response.ok) {
-    const responseText = await response.text();
+    const responseText =
+      await response.text();
 
     throw new Error(
       `Failed to create Transactions Trello card: ${
-        responseText || response.statusText
+        responseText ||
+        response.statusText
       }`,
     );
   }
 
-  return (await response.json()) as TrelloCard;
+  return (
+    await response.json()
+  ) as TrelloCard;
 }
 
 export async function getTransactionTrelloCard(
   cardId: string,
 ): Promise<TrelloCard> {
-  const normalizedCardId = cleanText(cardId);
+  const normalizedCardId =
+    cleanText(cardId);
 
   if (!normalizedCardId) {
     throw new Error(
@@ -296,7 +367,10 @@ export async function getTransactionTrelloCard(
     );
   }
 
-  const { key, token } =
+  const {
+    key,
+    token,
+  } =
     getTransactionsTrelloConfig();
 
   const response = await fetch(
@@ -314,23 +388,28 @@ export async function getTransactionTrelloCard(
   );
 
   if (!response.ok) {
-    const responseText = await response.text();
+    const responseText =
+      await response.text();
 
     throw new Error(
       `Failed to load Transactions Trello card: ${
-        responseText || response.statusText
+        responseText ||
+        response.statusText
       }`,
     );
   }
 
-  return (await response.json()) as TrelloCard;
+  return (
+    await response.json()
+  ) as TrelloCard;
 }
 
 export async function updateTransactionTrelloCard(
   cardId: string,
   transaction: TransactionRecord,
 ): Promise<TrelloCard> {
-  const normalizedCardId = cleanText(cardId);
+  const normalizedCardId =
+    cleanText(cardId);
 
   if (!normalizedCardId) {
     throw new Error(
@@ -338,7 +417,10 @@ export async function updateTransactionTrelloCard(
     );
   }
 
-  const { key, token } =
+  const {
+    key,
+    token,
+  } =
     getTransactionsTrelloConfig();
 
   const response = await fetch(
@@ -352,40 +434,50 @@ export async function updateTransactionTrelloCard(
     {
       method: "PUT",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type":
+          "application/json",
       },
       body: JSON.stringify({
-        name: buildTransactionCardName(
-          transaction.transactionNo,
-          transaction,
-        ),
-        desc: buildTransactionCardDescription(
-          transaction,
-        ),
+        name:
+          buildTransactionCardName(
+            transaction.transactionNo,
+            transaction,
+          ),
+        desc:
+          buildTransactionCardDescription(
+            transaction,
+          ),
       }),
       cache: "no-store",
     },
   );
 
   if (!response.ok) {
-    const responseText = await response.text();
+    const responseText =
+      await response.text();
 
     throw new Error(
       `Failed to update Transactions Trello card: ${
-        responseText || response.statusText
+        responseText ||
+        response.statusText
       }`,
     );
   }
 
-  return (await response.json()) as TrelloCard;
+  return (
+    await response.json()
+  ) as TrelloCard;
 }
 
 export async function moveTransactionTrelloCard(
   cardId: string,
   targetListId: string,
 ): Promise<TrelloCard> {
-  const normalizedCardId = cleanText(cardId);
-  const normalizedListId = cleanText(targetListId);
+  const normalizedCardId =
+    cleanText(cardId);
+
+  const normalizedListId =
+    cleanText(targetListId);
 
   if (!normalizedCardId) {
     throw new Error(
@@ -399,7 +491,10 @@ export async function moveTransactionTrelloCard(
     );
   }
 
-  const { key, token } =
+  const {
+    key,
+    token,
+  } =
     getTransactionsTrelloConfig();
 
   const response = await fetch(
@@ -413,32 +508,39 @@ export async function moveTransactionTrelloCard(
     {
       method: "PUT",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type":
+          "application/json",
       },
       body: JSON.stringify({
-        idList: normalizedListId,
+        idList:
+          normalizedListId,
       }),
       cache: "no-store",
     },
   );
 
   if (!response.ok) {
-    const responseText = await response.text();
+    const responseText =
+      await response.text();
 
     throw new Error(
       `Failed to move Transactions Trello card: ${
-        responseText || response.statusText
+        responseText ||
+        response.statusText
       }`,
     );
   }
 
-  return (await response.json()) as TrelloCard;
+  return (
+    await response.json()
+  ) as TrelloCard;
 }
 
 export async function archiveTransactionTrelloCard(
   cardId: string,
 ): Promise<TrelloCard> {
-  const normalizedCardId = cleanText(cardId);
+  const normalizedCardId =
+    cleanText(cardId);
 
   if (!normalizedCardId) {
     throw new Error(
@@ -446,7 +548,10 @@ export async function archiveTransactionTrelloCard(
     );
   }
 
-  const { key, token } =
+  const {
+    key,
+    token,
+  } =
     getTransactionsTrelloConfig();
 
   const response = await fetch(
@@ -460,7 +565,8 @@ export async function archiveTransactionTrelloCard(
     {
       method: "PUT",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type":
+          "application/json",
       },
       body: JSON.stringify({
         closed: true,
@@ -470,22 +576,27 @@ export async function archiveTransactionTrelloCard(
   );
 
   if (!response.ok) {
-    const responseText = await response.text();
+    const responseText =
+      await response.text();
 
     throw new Error(
       `Failed to archive Transactions Trello card: ${
-        responseText || response.statusText
+        responseText ||
+        response.statusText
       }`,
     );
   }
 
-  return (await response.json()) as TrelloCard;
+  return (
+    await response.json()
+  ) as TrelloCard;
 }
 
 export async function restoreTransactionTrelloCard(
   cardId: string,
 ): Promise<TrelloCard> {
-  const normalizedCardId = cleanText(cardId);
+  const normalizedCardId =
+    cleanText(cardId);
 
   if (!normalizedCardId) {
     throw new Error(
@@ -493,7 +604,10 @@ export async function restoreTransactionTrelloCard(
     );
   }
 
-  const { key, token } =
+  const {
+    key,
+    token,
+  } =
     getTransactionsTrelloConfig();
 
   const response = await fetch(
@@ -507,7 +621,8 @@ export async function restoreTransactionTrelloCard(
     {
       method: "PUT",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type":
+          "application/json",
       },
       body: JSON.stringify({
         closed: false,
@@ -517,22 +632,29 @@ export async function restoreTransactionTrelloCard(
   );
 
   if (!response.ok) {
-    const responseText = await response.text();
+    const responseText =
+      await response.text();
 
     throw new Error(
       `Failed to restore Transactions Trello card: ${
-        responseText || response.statusText
+        responseText ||
+        response.statusText
       }`,
     );
   }
 
-  return (await response.json()) as TrelloCard;
+  return (
+    await response.json()
+  ) as TrelloCard;
 }
 
 export async function deleteTransactionTrelloCard(
   cardId: string,
-): Promise<{ success: true }> {
-  const normalizedCardId = cleanText(cardId);
+): Promise<{
+  success: true;
+}> {
+  const normalizedCardId =
+    cleanText(cardId);
 
   if (!normalizedCardId) {
     throw new Error(
@@ -540,7 +662,10 @@ export async function deleteTransactionTrelloCard(
     );
   }
 
-  const { key, token } =
+  const {
+    key,
+    token,
+  } =
     getTransactionsTrelloConfig();
 
   const response = await fetch(
@@ -558,11 +683,13 @@ export async function deleteTransactionTrelloCard(
   );
 
   if (!response.ok) {
-    const responseText = await response.text();
+    const responseText =
+      await response.text();
 
     throw new Error(
       `Failed to delete Transactions Trello card: ${
-        responseText || response.statusText
+        responseText ||
+        response.statusText
       }`,
     );
   }
@@ -573,14 +700,24 @@ export async function deleteTransactionTrelloCard(
 }
 
 export async function verifyTransactionsTrelloConfig() {
-  const { key, token, boardId, listId } =
+  const {
+    key,
+    token,
+    boardId,
+    listId,
+  } =
     getTransactionsTrelloConfig();
 
-  const [boardResponse, listResponse] =
+  const [
+    boardResponse,
+    listResponse,
+  ] =
     await Promise.all([
       fetch(
         buildTrelloUrl(
-          `/boards/${encodeURIComponent(boardId)}`,
+          `/boards/${encodeURIComponent(
+            boardId,
+          )}`,
           key,
           token,
         ),
@@ -592,7 +729,9 @@ export async function verifyTransactionsTrelloConfig() {
 
       fetch(
         buildTrelloUrl(
-          `/lists/${encodeURIComponent(listId)}`,
+          `/lists/${encodeURIComponent(
+            listId,
+          )}`,
           key,
           token,
         ),
@@ -609,7 +748,8 @@ export async function verifyTransactionsTrelloConfig() {
 
     throw new Error(
       `Transactions Trello board could not be loaded: ${
-        responseText || boardResponse.statusText
+        responseText ||
+        boardResponse.statusText
       }`,
     );
   }
@@ -620,23 +760,28 @@ export async function verifyTransactionsTrelloConfig() {
 
     throw new Error(
       `Transactions Trello ATP list could not be loaded: ${
-        responseText || listResponse.statusText
+        responseText ||
+        listResponse.statusText
       }`,
     );
   }
 
-  const board = (await boardResponse.json()) as {
-    id: string;
-    name: string;
-  };
+  const board =
+    (await boardResponse.json()) as {
+      id: string;
+      name: string;
+    };
 
-  const list = (await listResponse.json()) as {
-    id: string;
-    idBoard: string;
-    name: string;
-  };
+  const list =
+    (await listResponse.json()) as {
+      id: string;
+      idBoard: string;
+      name: string;
+    };
 
-  if (list.idBoard !== board.id) {
+  if (
+    list.idBoard !== board.id
+  ) {
     throw new Error(
       `The Transactions list "${list.name}" does not belong to the configured board "${board.name}".`,
     );

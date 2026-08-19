@@ -30,7 +30,7 @@ type TransactionRecord = {
   formUsed: string[];
   taxpayerName: string;
   businessName: string;
-  branch: string;
+  tin: string;
   rdoCode: string;
   form1905: string[];
   computePenalty: string[];
@@ -314,7 +314,7 @@ export default function AtpProcessingPage() {
         transaction.transactionNo,
         transaction.taxpayerName,
         transaction.businessName,
-        transaction.branch,
+        transaction.tin,
         transaction.applicationMethod,
         transaction.mobileNumber,
         transaction.email,
@@ -661,9 +661,9 @@ export default function AtpProcessingPage() {
                                 </p>
                               )}
 
-                            {transaction.branch && (
+                            {transaction.tin && (
                               <p className="mt-1 text-xs text-[#8b7b68]">
-                                {transaction.branch}
+                                TIN: {transaction.tin}
                               </p>
                             )}
                           </TableCell>

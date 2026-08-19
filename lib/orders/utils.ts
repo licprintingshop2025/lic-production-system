@@ -4,6 +4,22 @@ export function clean(value: unknown) {
   return value?.toString().trim() || "";
 }
 
+export function getBranchFromTin(tin: string) {
+  const digitsOnly = clean(tin).replace(/\D/g, "");
+
+  if (digitsOnly.length < 5) {
+    return "";
+  }
+
+  const branchCode = digitsOnly.slice(-5);
+
+  if (branchCode === "00000") {
+    return "";
+  }
+
+  return String(Number(branchCode));
+}
+
 export function formatDateForTitle(dateString: string) {
   const date = new Date(dateString);
 
@@ -81,10 +97,26 @@ export function getReceiptCode(receiptType: string) {
   return value || "DOC";
 }
 
-export function buildOrderType(documents: DocumentItem[]) {
+export function buildOrderType(
+  documents: DocumentItem[],
+) {
   return documents
     .map((document) => {
-      return `${getReceiptCode(document.description)}-${document.booklets || "0"}`;
+      const description =
+        clean(
+          document.description,
+        ).toUpperCase();
+
+      const booklets =
+        clean(
+          document.booklets,
+        ) || "0";
+
+      return `${
+        description ||
+        "DOCUMENT"
+      }-${booklets}`;
     })
-    .join(" ");
+    .filter(Boolean)
+    .join(" / ");
 }

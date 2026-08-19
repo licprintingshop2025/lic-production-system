@@ -493,7 +493,7 @@ export default function NewAtpApplicationPage() {
         "businessName",
       ),
 
-      branch: getFormValue(formData, "branch"),
+      tin: getFormValue(formData, "tin"),
 
       rdoCode: getFormValue(
         formData,
@@ -735,12 +735,13 @@ export default function NewAtpApplicationPage() {
               />
             </FormField>
 
-            <FormField label="Branch">
+            <FormField label="TIN" required>
               <input
                 type="text"
-                name="branch"
+                name="tin"
+                required
                 disabled={isSubmitting}
-                placeholder="Enter branch"
+                placeholder="Example: 123-456-789-00000"
                 className={inputClassName}
               />
             </FormField>

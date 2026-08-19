@@ -125,7 +125,7 @@ type TransactionRecord = {
   formUsed: string[];
   taxpayerName: string;
   businessName: string;
-  branch: string;
+  tin: string;
   rdoCode: string;
   form1905: string[];
   computePenalty: string[];
@@ -280,7 +280,7 @@ export default function EditAtpApplicationPage() {
 
   const [taxpayerName, setTaxpayerName] = useState("");
   const [businessName, setBusinessName] = useState("");
-  const [branch, setBranch] = useState("");
+  const [tin, setTin] = useState("");
   const [rdoCode, setRdoCode] = useState("");
 
   const [selectedForm1905, setSelectedForm1905] =
@@ -340,7 +340,7 @@ export default function EditAtpApplicationPage() {
 
       setTaxpayerName(record.taxpayerName || "");
       setBusinessName(record.businessName || "");
-      setBranch(record.branch || "");
+      setTin(record.tin || "");
       setRdoCode(record.rdoCode || "");
 
       const form1905Values = splitKnownAndOtherValues(
@@ -669,7 +669,7 @@ export default function EditAtpApplicationPage() {
 
       taxpayerName: taxpayerName.trim(),
       businessName: businessName.trim(),
-      branch: branch.trim(),
+      tin: tin.trim(),
       rdoCode: rdoCode.trim().toUpperCase(),
 
       documents: normalizedDocuments,
@@ -1009,13 +1009,14 @@ export default function EditAtpApplicationPage() {
               />
             </FormField>
 
-            <FormField label="Branch">
+            <FormField label="TIN" required>
               <input
                 type="text"
-                value={branch}
+                value={tin}
+                required
                 disabled={isSubmitting}
                 onChange={(event) =>
-                  setBranch(event.target.value)
+                  setTin(event.target.value)
                 }
                 className={inputClassName}
               />

@@ -8,10 +8,17 @@ import type {
 const VALID_STATUSES: TransactionStatus[] = [
   "Pending",
   "In Progress",
-  "Waiting for Client",
+  "On Hold",
   "Completed",
   "Cancelled",
 ];
+
+const LEGACY_STATUS_MAP: Record<
+  string,
+  TransactionStatus
+> = {
+  "waiting for client": "On Hold",
+};
 
 export function cleanText(value: unknown): string {
   return String(value ?? "").trim();
@@ -24,7 +31,9 @@ export function requireText(
   const cleanedValue = cleanText(value);
 
   if (!cleanedValue) {
-    throw new Error(`${fieldName} is required.`);
+    throw new Error(
+      `${fieldName} is required.`,
+    );
   }
 
   return cleanedValue;
@@ -52,8 +61,12 @@ export function normalizeStringArray(
   return Array.from(
     new Set(
       cleanedValue
-        .split(/\s*\|\s*|\r?\n|,\s*/g)
-        .map((item) => item.trim())
+        .split(
+          /\s*\|\s*|\r?\n|,\s*/g,
+        )
+        .map((item) =>
+          item.trim(),
+        )
         .filter(Boolean),
     ),
   );
@@ -62,19 +75,39 @@ export function normalizeStringArray(
 export function serializeStringArray(
   values: string[],
 ): string {
-  return normalizeStringArray(values).join(" | ");
+  return normalizeStringArray(
+    values,
+  ).join(" | ");
 }
 
 export function normalizeTransactionStatus(
   value: unknown,
 ): TransactionStatus {
-  const cleanedValue = cleanText(value);
+  const cleanedValue =
+    cleanText(value);
 
-  const matchingStatus = VALID_STATUSES.find(
-    (status) =>
-      status.toLowerCase() ===
-      cleanedValue.toLowerCase(),
-  );
+  if (!cleanedValue) {
+    return "Pending";
+  }
+
+  const normalizedValue =
+    cleanedValue.toLowerCase();
+
+  const legacyStatus =
+    LEGACY_STATUS_MAP[
+      normalizedValue
+    ];
+
+  if (legacyStatus) {
+    return legacyStatus;
+  }
+
+  const matchingStatus =
+    VALID_STATUSES.find(
+      (status) =>
+        status.toLowerCase() ===
+        normalizedValue,
+    );
 
   return matchingStatus || "Pending";
 }
@@ -82,20 +115,22 @@ export function normalizeTransactionStatus(
 export function generateTransactionNumber(
   date = new Date(),
 ): string {
-  const year = String(date.getFullYear()).slice(-2);
+  const year = String(
+    date.getFullYear(),
+  ).slice(-2);
 
   const month = String(
     date.getMonth() + 1,
   ).padStart(2, "0");
 
-  const day = String(date.getDate()).padStart(
-    2,
-    "0",
-  );
+  const day = String(
+    date.getDate(),
+  ).padStart(2, "0");
 
-  const randomPart = randomBytes(4)
-    .toString("hex")
-    .toUpperCase();
+  const randomPart =
+    randomBytes(4)
+      .toString("hex")
+      .toUpperCase();
 
   return `TRX-${year}${month}${day}-${randomPart}`;
 }
@@ -111,32 +146,43 @@ export function normalizeTransactionDocuments(
     .map((item) => {
       if (
         !item ||
-        typeof item !== "object" ||
+        typeof item !==
+          "object" ||
         Array.isArray(item)
       ) {
         return null;
       }
 
       const rawDocument =
-        item as Record<string, unknown>;
+        item as Record<
+          string,
+          unknown
+        >;
 
-      const documentType = cleanText(
-        rawDocument.documentType,
-      );
+      const documentType =
+        cleanText(
+          rawDocument.documentType,
+        );
 
-      const taxType = cleanText(
-        rawDocument.taxType,
-      );
+      const taxType =
+        cleanText(
+          rawDocument.taxType,
+        );
 
-      const quantity = Number(
-        rawDocument.quantity,
-      );
+      const quantity =
+        Number(
+          rawDocument.quantity,
+        );
 
       if (
         !documentType ||
         !taxType ||
-        !Number.isFinite(quantity) ||
-        !Number.isInteger(quantity) ||
+        !Number.isFinite(
+          quantity,
+        ) ||
+        !Number.isInteger(
+          quantity,
+        ) ||
         quantity < 1
       ) {
         return null;
@@ -169,10 +215,13 @@ export function validateTransactionDocuments(
   }
 
   const normalizedDocuments =
-    normalizeTransactionDocuments(value);
+    normalizeTransactionDocuments(
+      value,
+    );
 
   if (
-    normalizedDocuments.length !== value.length
+    normalizedDocuments.length !==
+    value.length
   ) {
     throw new Error(
       "Each invoice or receipt must have a document type, tax type, and whole-number quantity of at least 1.",
@@ -183,13 +232,19 @@ export function validateTransactionDocuments(
 }
 
 export function normalizeTransactionInput(
-  body: Record<string, unknown>,
+  body: Record<
+    string,
+    unknown
+  >,
 ): TransactionInput {
-  const formUsed = normalizeStringArray(
-    body.formUsed,
-  );
+  const formUsed =
+    normalizeStringArray(
+      body.formUsed,
+    );
 
-  if (formUsed.length === 0) {
+  if (
+    formUsed.length === 0
+  ) {
     throw new Error(
       "Please select at least one Form Used option.",
     );
@@ -201,65 +256,87 @@ export function normalizeTransactionInput(
     );
 
   return {
-    dateReceived: requireText(
-      body.dateReceived,
-      "Date Received of Application",
-    ),
+    dateReceived:
+      requireText(
+        body.dateReceived,
+        "Date Received of Application",
+      ),
 
-    applicationMethod: requireText(
-      body.applicationMethod ??
-        body.processingMethod ??
-        body.manualOrOrus,
-      "Manual or ORUS",
-    ),
+    applicationMethod:
+      requireText(
+        body.applicationMethod ??
+          body.processingMethod ??
+          body.manualOrOrus,
+        "Manual or ORUS",
+      ),
 
     formUsed,
 
-    form1905: normalizeStringArray(
-      body.form1905,
-    ),
+    form1905:
+      normalizeStringArray(
+        body.form1905,
+      ),
 
-    computePenalty: normalizeStringArray(
-      body.computePenalty ??
-        body.penalty0605,
-    ),
+    computePenalty:
+      normalizeStringArray(
+        body.computePenalty ??
+          body.penalty0605,
+      ),
 
-    taxpayerName: requireText(
-      body.taxpayerName,
-      "Taxpayer Name",
-    ),
+    taxpayerName:
+      requireText(
+        body.taxpayerName,
+        "Taxpayer Name",
+      ),
 
-    businessName: requireText(
-      body.businessName ??
-        body.businessTradename,
-      "Business / Trade Name",
-    ),
+    businessName:
+      requireText(
+        body.businessName ??
+          body.businessTradename,
+        "Business / Trade Name",
+      ),
 
-    branch: cleanText(body.branch),
+    tin:
+      requireText(
+        body.tin,
+        "TIN",
+      ),
 
-    rdoCode: requireText(
-      body.rdoCode ?? body.rdo,
-      "RDO Code",
-    ).toUpperCase(),
+    rdoCode:
+      requireText(
+        body.rdoCode ??
+          body.rdo,
+        "RDO Code",
+      ).toUpperCase(),
 
     documents,
 
-    mobileNumber: cleanText(
-      body.mobileNumber ?? body.mobile,
-    ),
+    mobileNumber:
+      cleanText(
+        body.mobileNumber ??
+          body.mobile,
+      ),
 
-    email: cleanText(body.email),
+    email:
+      cleanText(
+        body.email,
+      ),
 
-    assistedBy: requireText(
-      body.assistedBy,
-      "Assisted By",
-    ),
+    assistedBy:
+      requireText(
+        body.assistedBy,
+        "Assisted By",
+      ),
 
-    books: normalizeStringArray(body.books),
+    books:
+      normalizeStringArray(
+        body.books,
+      ),
 
-    status: normalizeTransactionStatus(
-      body.status,
-    ),
+    status:
+      normalizeTransactionStatus(
+        body.status,
+      ),
   };
 }
 
@@ -267,8 +344,12 @@ export function getTotalDocumentQuantity(
   documents: TransactionDocument[],
 ): number {
   return documents.reduce(
-    (total, document) =>
-      total + document.quantity,
+    (
+      total,
+      document,
+    ) =>
+      total +
+      document.quantity,
     0,
   );
 }
@@ -300,29 +381,46 @@ export function getUniqueTaxTypes(
 export function parseDocumentDescription(
   value: string,
 ): TransactionDocument | null {
-  const cleanedValue = cleanText(value);
+  const cleanedValue =
+    cleanText(value);
 
   if (!cleanedValue) {
     return null;
   }
 
-  const match = cleanedValue.match(
-    /^(.*?)\s*\[(.*?)\]\s*x\s*(\d+)$/i,
-  );
+  const match =
+    cleanedValue.match(
+      /^(.*?)\s*\[(.*?)\]\s*x\s*(\d+)$/i,
+    );
 
   if (!match) {
     return null;
   }
 
-  const documentType = cleanText(match[1]);
-  const taxType = cleanText(match[2]);
-  const quantity = Number(match[3]);
+  const documentType =
+    cleanText(
+      match[1],
+    );
+
+  const taxType =
+    cleanText(
+      match[2],
+    );
+
+  const quantity =
+    Number(
+      match[3],
+    );
 
   if (
     !documentType ||
     !taxType ||
-    !Number.isFinite(quantity) ||
-    !Number.isInteger(quantity) ||
+    !Number.isFinite(
+      quantity,
+    ) ||
+    !Number.isInteger(
+      quantity,
+    ) ||
     quantity < 1
   ) {
     return null;
@@ -338,8 +436,12 @@ export function parseDocumentDescription(
 export function parseDocumentsFromSheet(
   value: unknown,
 ): TransactionDocument[] {
-  return normalizeStringArray(value)
-    .map(parseDocumentDescription)
+  return normalizeStringArray(
+    value,
+  )
+    .map(
+      parseDocumentDescription,
+    )
     .filter(
       (
         document,
