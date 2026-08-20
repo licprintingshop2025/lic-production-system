@@ -206,12 +206,20 @@ export function validateTransactionDocuments(
   value: unknown,
 ): TransactionDocument[] {
   if (
-    !Array.isArray(value) ||
-    value.length === 0
+    value === undefined ||
+    value === null
   ) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
     throw new Error(
-      "Please add at least one invoice or receipt.",
+      "Invoice or receipt information must be a valid list.",
     );
+  }
+
+  if (value.length === 0) {
+    return [];
   }
 
   const normalizedDocuments =
@@ -224,7 +232,7 @@ export function validateTransactionDocuments(
     value.length
   ) {
     throw new Error(
-      "Each invoice or receipt must have a document type, tax type, and whole-number quantity of at least 1.",
+      "Each invoice or receipt that is entered must have a document type, tax type, and whole-number quantity of at least 1.",
     );
   }
 
