@@ -204,21 +204,29 @@ export function buildNonBIRCardDescription(
   order: NonBIROrder,
 ) {
   return `
-Tracking Number
-${clean(order.trackingNumber) || "-"}
+TRACKING: ${
+    clean(
+      order.trackingNumber,
+    ) || "-"
+  }
 
-Business
-${clean(order.businessName) || "-"}
+BUSINESS: ${
+    clean(
+      order.businessName,
+    ) || "-"
+  }
 
-Documents Included
+DOCUMENTS INCLUDED:
 ${buildNonBIRDocumentSection(
   order.documents,
 )}
 
-Sales Assigned
-${clean(order.salesAssigned) || "-"}
+SALES ASSIGNED: ${
+    clean(
+      order.salesAssigned,
+    ) || "-"
+  }
 
-Order Type
-NON-BIR
+ORDER TYPE: NON-BIR
 `.trim();
 }

@@ -107,7 +107,7 @@ const ASSISTED_BY_OPTIONS = [
 const STATUS_OPTIONS = [
   "Pending",
   "In Progress",
-  "Waiting for Client",
+  "On Hold",
   "Completed",
   "Cancelled",
 ];

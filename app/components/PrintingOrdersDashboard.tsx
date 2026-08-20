@@ -23,7 +23,7 @@ export type PrintingOrderRecord = {
   currentStage: string;
   currentListId: string;
   status:
-    | "Intake"
+    | "In Admin"
     | "In Production"
     | "Ready for Release"
     | "Completed"
@@ -49,7 +49,7 @@ type Props = {
 
 const STATUS_OPTIONS = [
   "ALL",
-  "Intake",
+  "In Admin",
   "In Production",
   "Ready for Release",
   "Completed",
@@ -140,7 +140,7 @@ function statusClassName(
     case "In Production":
       return "border-blue-200 bg-blue-50 text-blue-800";
 
-    case "Intake":
+    case "In Admin":
       return "border-[#e6d3ae] bg-[#fff7e8] text-[#7a5421]";
 
     default:
@@ -308,11 +308,11 @@ export default function PrintingOrdersDashboard({
         total:
           orders.length,
 
-        intake:
+        inAdmin:
           orders.filter(
             (order) =>
               order.status ===
-              "Intake",
+              "In Admin",
           ).length,
 
         inProduction:
@@ -502,11 +502,11 @@ export default function PrintingOrdersDashboard({
         />
 
         <SummaryCard
-          label="Intake"
+          label="In Admin"
           value={
-            summary.intake
+            summary.inAdmin
           }
-          description="Waiting to enter production"
+          description="Under admin processing"
         />
 
         <SummaryCard
