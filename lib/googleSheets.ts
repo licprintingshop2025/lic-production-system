@@ -11,6 +11,9 @@ import {
   parseDocumentsFromSheet,
   serializeStringArray,
 } from "@/lib/transactions/utils";
+import {
+  getPHDateTime,
+} from "@/lib/dateTime";
 
 function getSheetsClient() {
   const sheetId = process.env.GOOGLE_SHEET_ID;
@@ -1118,7 +1121,7 @@ export function mergeTransactionRecord(
       existing.createdAt,
 
     updatedAt:
-      new Date().toISOString(),
+      getPHDateTime(),
 
     trelloCardId:
       existing.trelloCardId,

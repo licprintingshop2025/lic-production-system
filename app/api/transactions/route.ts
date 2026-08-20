@@ -16,6 +16,9 @@ import {
   generateTransactionNumber,
   normalizeTransactionInput,
 } from "@/lib/transactions/utils";
+import {
+  getPHDateTime,
+} from "@/lib/dateTime";
 
 export const dynamic = "force-dynamic";
 
@@ -651,7 +654,7 @@ export async function POST(
       generateTransactionNumber();
 
     const now =
-      new Date().toISOString();
+      getPHDateTime();
 
     const transactionWithoutCard = {
       ...transactionInput,

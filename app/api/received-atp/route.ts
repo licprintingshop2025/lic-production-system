@@ -11,6 +11,9 @@ import {
   buildReceivedATPCardName,
 } from "@/lib/orders/trello";
 import { buildReceivedATPRow } from "@/lib/orders/sheets";
+import {
+  getPHDateTime,
+} from "@/lib/dateTime";
 
 type DashboardCard = {
   id: string;
@@ -360,7 +363,7 @@ export async function POST(
       generateTrackingNumber();
 
     const submittedAt =
-      new Date().toISOString();
+      getPHDateTime();
 
     const documents =
       normalizeDocuments(

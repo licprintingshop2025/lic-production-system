@@ -1,4 +1,4 @@
-import { formatPHDateTime, getPHDateTime } from "@/lib/dateTime";
+import { getPHDateTime } from "@/lib/dateTime";
 import type { DocumentItem, NonBIROrder, ReceivedATPOrder } from "./types";
 import { COPIES_PER_SET_OPTIONS, RECEIPT_TYPES } from "./constants";
 import { clean, getBranchFromTin, joinDocumentValues } from "./utils";
@@ -89,17 +89,34 @@ function buildDocumentsFromColumns({
   );
 }
 
-export function buildReceivedATPRow(order: ReceivedATPOrder, cardId: string) {
-  const rdoCode = clean(order.rdoCode).toUpperCase();
+export function buildReceivedATPRow(
+  order: ReceivedATPOrder,
+  cardId: string,
+) {
+  const rdoCode =
+    clean(order.rdoCode).toUpperCase();
+
   const staffName =
     order.salesAssigned === "OTHERS"
       ? clean(order.salesAssignedOther)
       : clean(order.salesAssigned);
-  const tradeName = clean(order.businessName || order.taxpayerName);
-  const atpStatus = clean(order.atpStatus || order.atpReceived || "ATP");
+
+  const tradeName =
+    clean(
+      order.businessName ||
+        order.taxpayerName,
+    );
+
+  const atpStatus =
+    clean(
+      order.atpStatus ||
+        order.atpReceived ||
+        "ATP",
+    );
 
   return [
-    order.submittedAt ? formatPHDateTime(order.submittedAt) : getPHDateTime(),
+    clean(order.submittedAt) ||
+      getPHDateTime(),
     order.trackingNo,
     order.dateOfAtp,
     clean(order.ocn),
@@ -108,13 +125,31 @@ export function buildReceivedATPRow(order: ReceivedATPOrder, cardId: string) {
     tradeName,
     clean(order.registeredAddress),
     rdoCode,
-    joinDocumentValues(order.documents, "manner"),
-    joinDocumentValues(order.documents, "description"),
+    joinDocumentValues(
+      order.documents,
+      "manner",
+    ),
+    joinDocumentValues(
+      order.documents,
+      "description",
+    ),
     clean(order.taxType),
-    joinDocumentValues(order.documents, "booklets"),
-    joinDocumentValues(order.documents, "setsPerBooklet"),
-    joinDocumentValues(order.documents, "copiesPerSet"),
-    joinDocumentValues(order.documents, "serialNumbers"),
+    joinDocumentValues(
+      order.documents,
+      "booklets",
+    ),
+    joinDocumentValues(
+      order.documents,
+      "setsPerBooklet",
+    ),
+    joinDocumentValues(
+      order.documents,
+      "copiesPerSet",
+    ),
+    joinDocumentValues(
+      order.documents,
+      "serialNumbers",
+    ),
     atpStatus,
     staffName,
     cardId,
