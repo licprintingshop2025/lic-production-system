@@ -374,8 +374,12 @@ export default function ReceivedATPPage() {
                 "ALGEAN",
                 "AI",
                 "DENNIS",
-                "LIC NEW CUSTOMER",
-                "LIC REPEAT CUSTOMER",
+                "LIC NEW CUSTOMER / GELO",
+                "LIC NEW CUSTOMER / TINA",
+                "LIC NEW CUSTOMER / TINE",
+                "LIC REPEAT CUSTOMER / GELO",
+                "LIC REPEAT CUSTOMER / TINA",
+                "LIC REPEAT CUSTOMER / TINE",
                 "OTHERS",
               ]}
             />
