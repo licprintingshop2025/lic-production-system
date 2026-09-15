@@ -159,6 +159,12 @@ type DocumentItem = {
   quantity: string;
 };
 
+type NormalizedDocument = {
+  documentType: string;
+  taxType: string;
+  quantity: number;
+};
+
 function createDocumentItem(
   document?: Partial<TransactionDocument>,
 ): DocumentItem {
@@ -254,6 +260,24 @@ function resolveTaxType(document: DocumentItem): string {
   return document.taxType.trim();
 }
 
+/*
+ * Invoice / receipt information is optional.
+ *
+ * A completely blank document row is ignored.
+ *
+ * Once the user enters anything in the row,
+ * all document details must be completed.
+ */
+function hasDocumentInput(
+  document: DocumentItem,
+): boolean {
+  return Boolean(
+    resolveDocumentType(document) ||
+      resolveTaxType(document) ||
+      document.quantity.trim(),
+  );
+}
+
 export default function EditAtpApplicationPage() {
   const router = useRouter();
 
@@ -269,6 +293,7 @@ export default function EditAtpApplicationPage() {
     useState<TransactionRecord | null>(null);
 
   const [dateReceived, setDateReceived] = useState("");
+
   const [applicationMethod, setApplicationMethod] =
     useState("");
 
@@ -328,7 +353,10 @@ export default function EditAtpApplicationPage() {
       setTransaction(record);
 
       setDateReceived(record.dateReceived || "");
-      setApplicationMethod(record.applicationMethod || "");
+
+      setApplicationMethod(
+        record.applicationMethod || "",
+      );
 
       const formUsedValues = splitKnownAndOtherValues(
         record.formUsed || [],
@@ -491,7 +519,7 @@ export default function EditAtpApplicationPage() {
   function removeDocument(id: string) {
     setDocuments((currentDocuments) => {
       if (currentDocuments.length === 1) {
-        return currentDocuments;
+        return [createDocumentItem()];
       }
 
       return currentDocuments.filter(
@@ -588,54 +616,86 @@ export default function EditAtpApplicationPage() {
       return;
     }
 
-    const normalizedDocuments = documents.map(
-      (document) => ({
-        documentType: resolveDocumentType(document),
-        taxType: resolveTaxType(document),
-        quantity: Number(document.quantity),
-      }),
+    /*
+     * DOCUMENTS ARE OPTIONAL.
+     *
+     * Completely blank document rows are ignored.
+     *
+     * Once any part of a document row is entered,
+     * the document type, tax type and quantity
+     * must all be completed.
+     */
+    const filledDocuments = documents.filter(
+      hasDocumentInput,
     );
+
+    const normalizedDocuments: NormalizedDocument[] = [];
 
     for (
       let index = 0;
-      index < normalizedDocuments.length;
+      index < filledDocuments.length;
       index += 1
     ) {
-      const document = normalizedDocuments[index];
+      const sourceDocument = filledDocuments[index];
 
-      if (!document.documentType) {
+      const documentType =
+        resolveDocumentType(sourceDocument);
+
+      const taxType =
+        resolveTaxType(sourceDocument);
+
+      const quantity = Number(
+        sourceDocument.quantity,
+      );
+
+      /*
+       * Use the original document position in the UI
+       * so validation messages still reference the
+       * correct Document number.
+       */
+      const originalIndex = documents.findIndex(
+        (document) =>
+          document.id === sourceDocument.id,
+      );
+
+      const documentNumber =
+        originalIndex >= 0
+          ? originalIndex + 1
+          : index + 1;
+
+      if (!documentType) {
         setSubmissionError(
-          `Select the invoice or receipt type for Document ${
-            index + 1
-          }.`,
+          `Select the invoice or receipt type for Document ${documentNumber}.`,
         );
 
         return;
       }
 
-      if (!document.taxType) {
+      if (!taxType) {
         setSubmissionError(
-          `Select the tax type for Document ${
-            index + 1
-          }.`,
+          `Select the tax type for Document ${documentNumber}.`,
         );
 
         return;
       }
 
       if (
-        !Number.isFinite(document.quantity) ||
-        !Number.isInteger(document.quantity) ||
-        document.quantity < 1
+        !Number.isFinite(quantity) ||
+        !Number.isInteger(quantity) ||
+        quantity < 1
       ) {
         setSubmissionError(
-          `The quantity for Document ${
-            index + 1
-          } must be a whole number of at least 1.`,
+          `The quantity for Document ${documentNumber} must be a whole number of at least 1.`,
         );
 
         return;
       }
+
+      normalizedDocuments.push({
+        documentType,
+        taxType,
+        quantity,
+      });
     }
 
     const resolvedAssistedBy =
@@ -693,9 +753,11 @@ export default function EditAtpApplicationPage() {
         )}`,
         {
           method: "PUT",
+
           headers: {
             "Content-Type": "application/json",
           },
+
           body: JSON.stringify(payload),
         },
       );
@@ -730,11 +792,22 @@ export default function EditAtpApplicationPage() {
     }
   }
 
+  const filledDocumentCount = documents.filter(
+    hasDocumentInput,
+  ).length;
+
   const totalDocumentQuantity = documents.reduce(
     (total, document) => {
+      if (!hasDocumentInput(document)) {
+        return total;
+      }
+
       const quantity = Number(document.quantity);
 
-      if (!Number.isFinite(quantity) || quantity < 0) {
+      if (
+        !Number.isFinite(quantity) ||
+        quantity < 0
+      ) {
         return total;
       }
 
@@ -1009,7 +1082,10 @@ export default function EditAtpApplicationPage() {
               />
             </FormField>
 
-            <FormField label="TIN" required>
+            <FormField
+              label="TIN"
+              required
+            >
               <input
                 type="text"
                 value={tin}
@@ -1133,9 +1209,16 @@ export default function EditAtpApplicationPage() {
         <FormSection
           number="3"
           title="Invoice or Receipt Information"
-          description="Update each document type, tax type, and corresponding quantity."
+          description="Optional. Leave this section blank when the transaction does not involve an invoice or receipt. If you enter any document information, complete all fields for that document."
         >
           <div className="space-y-4">
+            <div className="rounded-xl border border-[#eadfce] bg-[#fffaf2] px-4 py-3">
+              <p className="text-xs leading-5 text-[#766958]">
+                Invoice or receipt information is optional. A
+                completely blank document will not be saved.
+              </p>
+            </div>
+
             {documents.map(
               (document, index) => (
                 <DocumentItemFields
@@ -1158,13 +1241,19 @@ export default function EditAtpApplicationPage() {
                   Total Booklets or Pads
                 </p>
 
-                <p className="mt-1 text-sm text-[#6f6254]">
-                  {totalDocumentQuantity} total
-                  across {documents.length} document
-                  {documents.length === 1
-                    ? ""
-                    : "s"}
-                </p>
+                {filledDocumentCount > 0 ? (
+                  <p className="mt-1 text-sm text-[#6f6254]">
+                    {totalDocumentQuantity} total
+                    across {filledDocumentCount} document
+                    {filledDocumentCount === 1
+                      ? ""
+                      : "s"}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-sm text-[#6f6254]">
+                    No invoice or receipt added
+                  </p>
+                )}
               </div>
 
               <button
@@ -1604,6 +1693,9 @@ function DocumentItemFields({
   ) => void;
   onRemove: (id: string) => void;
 }) {
+  const documentHasInput =
+    hasDocumentInput(document);
+
   return (
     <section className="rounded-xl border border-[#ddd0bd] bg-[#fffdf9] p-4 sm:p-5">
       <div className="mb-4 flex items-center justify-between gap-4">
@@ -1612,9 +1704,17 @@ function DocumentItemFields({
             Invoice or Receipt
           </p>
 
-          <h3 className="mt-1 text-base font-black text-black">
-            Document {index + 1}
-          </h3>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h3 className="text-base font-black text-black">
+              Document {index + 1}
+            </h3>
+
+            {!documentHasInput && (
+              <span className="rounded-full border border-[#dfd1bd] bg-[#fbf7ef] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#7c6a56]">
+                Optional
+              </span>
+            )}
+          </div>
         </div>
 
         {canRemove && (
@@ -1634,7 +1734,7 @@ function DocumentItemFields({
       <div className="grid gap-5 lg:grid-cols-3">
         <FormField
           label="Kind of Invoice or Receipt"
-          required
+          required={documentHasInput}
         >
           <select
             value={document.documentType}
@@ -1648,10 +1748,7 @@ function DocumentItemFields({
             }
             className={inputClassName}
           >
-            <option
-              value=""
-              disabled
-            >
+            <option value="">
               Select document
             </option>
 
@@ -1685,7 +1782,7 @@ function DocumentItemFields({
 
         <FormField
           label="Tax Type"
-          required
+          required={documentHasInput}
         >
           <select
             value={document.taxType}
@@ -1699,10 +1796,7 @@ function DocumentItemFields({
             }
             className={inputClassName}
           >
-            <option
-              value=""
-              disabled
-            >
+            <option value="">
               Select tax type
             </option>
 
@@ -1736,7 +1830,7 @@ function DocumentItemFields({
 
         <FormField
           label="No. of Booklets or Pads"
-          required
+          required={documentHasInput}
         >
           <input
             type="number"
@@ -1751,6 +1845,7 @@ function DocumentItemFields({
                 event.target.value,
               )
             }
+            placeholder="Optional"
             className={inputClassName}
           />
         </FormField>

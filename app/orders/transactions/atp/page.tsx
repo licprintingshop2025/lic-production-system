@@ -608,9 +608,9 @@ export default function AtpProcessingPage() {
                       Status
                     </TableHeader>
 
-                    <TableHeader align="right">
+                    <th className="sticky right-0 z-20 min-w-[150px] whitespace-nowrap border-l border-[#eee5d8] bg-[#fffdf9] px-4 py-4 text-right text-xs font-black uppercase tracking-[0.1em] text-[#6b5a47] shadow-[-10px_0_14px_-14px_rgba(0,0,0,0.35)]">
                       Actions
-                    </TableHeader>
+                    </th>
                   </tr>
                 </thead>
 
@@ -625,7 +625,7 @@ export default function AtpProcessingPage() {
                       return (
                         <tr
                           key={`${transaction.transactionNo}-${transaction.rowNumber}`}
-                          className="border-b border-[#f0e8dc] align-top transition last:border-b-0 hover:bg-[#fffaf2]"
+                          className="group border-b border-[#f0e8dc] align-top transition last:border-b-0 hover:bg-[#fffaf2]"
                         >
                           <TableCell>
                             <p className="font-mono text-xs font-black text-black">
@@ -720,11 +720,11 @@ export default function AtpProcessingPage() {
                             />
                           </TableCell>
 
-                          <TableCell align="right">
+                          <td className="sticky right-0 z-10 min-w-[150px] border-l border-[#eee5d8] bg-white px-4 py-5 text-right text-sm text-[#3d3329] shadow-[-10px_0_14px_-14px_rgba(0,0,0,0.35)] transition group-hover:bg-[#fffaf2]">
                             <div className="flex justify-end gap-2">
                               <Link
                                 href={recordUrl}
-                                className="inline-flex h-9 items-center justify-center rounded-lg border border-[#d5c6b2] bg-white px-3 text-xs font-black text-black transition hover:bg-[#f8f2e8]"
+                                className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-lg border border-[#d5c6b2] bg-white px-3 text-xs font-black text-black transition hover:bg-[#f8f2e8]"
                               >
                                 {transaction.canEdit
                                   ? "Edit"
@@ -738,13 +738,13 @@ export default function AtpProcessingPage() {
                                   }
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="inline-flex h-9 items-center justify-center rounded-lg bg-black px-3 text-xs font-black text-white transition hover:bg-[#6b421f]"
+                                  className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-lg bg-black px-3 text-xs font-black text-white transition hover:bg-[#6b421f]"
                                 >
                                   Trello
                                 </a>
                               )}
                             </div>
-                          </TableCell>
+                          </td>
                         </tr>
                       );
                     },
@@ -816,9 +816,7 @@ export default function AtpProcessingPage() {
                           }
                         />
 
-                        <MobileDetail
-                          label="Form Used"
-                        >
+                        <MobileDetail label="Form Used">
                           <ValueList
                             values={
                               transaction.formUsed
@@ -826,9 +824,7 @@ export default function AtpProcessingPage() {
                           />
                         </MobileDetail>
 
-                        <MobileDetail
-                          label="Documents"
-                        >
+                        <MobileDetail label="Documents">
                           <DocumentViewer
                             documents={
                               transaction.documents ||
@@ -856,7 +852,7 @@ export default function AtpProcessingPage() {
                             }
                             emptyText="—"
                           />
-                        </MobileDetail>                        
+                        </MobileDetail>
                       </dl>
 
                       <div className="mt-5 flex flex-wrap gap-3">
@@ -1099,7 +1095,9 @@ function ValueList({
 }) {
   const validValues = Array.isArray(values)
     ? values
-        .map((value) => String(value || "").trim())
+        .map((value) =>
+          String(value || "").trim(),
+        )
         .filter(Boolean)
     : [];
 
