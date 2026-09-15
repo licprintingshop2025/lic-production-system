@@ -1,6 +1,9 @@
 "use client";
 
 import AppShell from "@/app/components/AppShell";
+import ATPScannerPanel, {
+  type ATPExtraction,
+} from "@/app/components/forms/ATPScannerPanel";
 import DocumentItemCard, {
   createEmptyDocument,
 } from "@/app/components/forms/DocumentItemCard";
@@ -45,6 +48,83 @@ function createInitialFormData(): FormData {
   };
 }
 
+function mergeExtractedDocuments(
+  currentDocuments: DocumentItem[],
+  extractedDocuments: Omit<DocumentItem, "id">[],
+): DocumentItem[] {
+  if (extractedDocuments.length === 0) {
+    return currentDocuments;
+  }
+
+  // The form starts with one intentionally blank document whose only default is
+  // 50 sets/booklet. On the first scan it is safe to replace that placeholder.
+  if (
+    currentDocuments.length === 1 &&
+    isPristineDocument(currentDocuments[0])
+  ) {
+    return extractedDocuments.map((document) => ({
+      ...document,
+      id: createDocumentId(),
+    }));
+  }
+
+  const merged = currentDocuments.map((currentDocument, index) => {
+    const extractedDocument = extractedDocuments[index];
+    if (!extractedDocument) return currentDocument;
+
+    return {
+      ...currentDocument,
+      // Existing non-empty values win so a re-scan cannot erase or replace
+      // corrections already made by staff.
+      description:
+        currentDocument.description || extractedDocument.description,
+      descriptionOther:
+        currentDocument.descriptionOther || extractedDocument.descriptionOther,
+      manner: currentDocument.manner || extractedDocument.manner,
+      booklets: currentDocument.booklets || extractedDocument.booklets,
+      setsPerBooklet:
+        currentDocument.setsPerBooklet || extractedDocument.setsPerBooklet,
+      copiesPerSet:
+        currentDocument.copiesPerSet || extractedDocument.copiesPerSet,
+      copiesPerSetOther:
+        currentDocument.copiesPerSetOther ||
+        extractedDocument.copiesPerSetOther,
+      serialNumbers:
+        currentDocument.serialNumbers || extractedDocument.serialNumbers,
+    };
+  });
+
+  if (extractedDocuments.length > currentDocuments.length) {
+    merged.push(
+      ...extractedDocuments
+        .slice(currentDocuments.length)
+        .map((document) => ({
+          ...document,
+          id: createDocumentId(),
+        })),
+    );
+  }
+
+  return merged;
+}
+
+function isPristineDocument(document: DocumentItem) {
+  return (
+    !document.description &&
+    !document.descriptionOther &&
+    !document.manner &&
+    !document.booklets &&
+    (!document.setsPerBooklet || document.setsPerBooklet === "50") &&
+    !document.copiesPerSet &&
+    !document.copiesPerSetOther &&
+    !document.serialNumbers
+  );
+}
+
+function createDocumentId() {
+  return `${Date.now()}-${Math.random()}`;
+}
+
 export default function ReceivedATPPage() {
   const [formData, setFormData] =
     useState<FormData>(createInitialFormData());
@@ -63,6 +143,28 @@ export default function ReceivedATPPage() {
       ...current,
       [event.target.name]: event.target.value,
     }));
+  }
+
+  function handleApplyATPExtraction(extraction: ATPExtraction) {
+    setFormData((current) => ({
+      ...current,
+      // Never overwrite values that a staff member has already typed.
+      dateOfAtp: current.dateOfAtp || extraction.dateOfAtp,
+      ocn: current.ocn || extraction.ocn,
+      tin: current.tin || extraction.tin,
+      taxpayerName: current.taxpayerName || extraction.taxpayerName,
+      businessName: current.businessName || extraction.businessName,
+      registeredAddress:
+        current.registeredAddress || extraction.registeredAddress,
+      rdoCode: current.rdoCode || extraction.rdoCode,
+      taxType: current.taxType || extraction.taxType,
+      documents: mergeExtractedDocuments(
+        current.documents,
+        extraction.documents,
+      ),
+    }));
+
+    setErrorMessage("");
   }
 
   function handleDocumentChange(
@@ -216,9 +318,16 @@ export default function ReceivedATPPage() {
         </section>
       )}
 
+      <div className="mt-7">
+        <ATPScannerPanel
+          disabled={saving}
+          onApply={handleApplyATPExtraction}
+        />
+      </div>
+
       <form
         onSubmit={handleSubmit}
-        className="mt-7 space-y-6"
+        className="mt-6 space-y-6"
       >
         <FormSection
           number="1"
